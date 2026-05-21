@@ -13,3 +13,11 @@ engine = create_engine(
 
 # A 'fábrica' de sessões. Cada requisição na API abrirá uma sessão e a fechará no final.
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Dependency injection para o FastAPI: abre uma sessão por requisição e garante o fechamento.
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
