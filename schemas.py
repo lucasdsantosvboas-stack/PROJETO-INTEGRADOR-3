@@ -1,5 +1,5 @@
 # schemas.py
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import Optional
 from datetime import datetime, date
 from domain import TipoTransacao, TipoCliente, TipoParcela, StatusPagamento, StatusImovel
@@ -81,5 +81,20 @@ class PagamentoParcelaResponse(PagamentoParcelaBase):
     id: int
     status_pagamento: StatusPagamento
     data_pagamento_efetivo: Optional[date] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class CorretorBase(BaseModel):
+    nome: str = Field(..., min_length=3, max_length=100)
+    email: EmailStr
+    registro_profissional: str = Field(..., description="CRECI ou similar")
+
+class CorretorCreate(CorretorBase):
+    senha: str = Field(..., min_length=8, description="Senha forte para acesso")
+
+class CorretorResponse(CorretorBase):
+    id: int
+    ativo: bool
+    # Repare: não há campo de senha aqui. O frontend nunca recebe a senha de volta.
 
     model_config = ConfigDict(from_attributes=True)

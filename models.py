@@ -71,3 +71,15 @@ class PagamentoParcela(Base):
     
     status_pagamento: Mapped[StatusPagamento] = mapped_column(SQLEnum(StatusPagamento), default=StatusPagamento.PENDENTE)
     tipo_parcela: Mapped[TipoParcela] = mapped_column(SQLEnum(TipoParcela), nullable=False)
+
+class Corretor(Base):
+    __tablename__ = "corretores"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    nome: Mapped[str] = mapped_column(String(100), nullable=False)
+    email: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
+    registro_profissional: Mapped[str] = mapped_column(String(50), unique=True, nullable=False) # Ex: CRECI
+    
+    # NUNCA salve a senha pura. 
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    ativo: Mapped[bool] = mapped_column(default=True)
