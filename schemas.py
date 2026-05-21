@@ -2,7 +2,7 @@
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import Optional
 from datetime import datetime, date
-from domain import TipoTransacao, TipoCliente, TipoParcela, StatusPagamento, StatusImovel
+from domain import TipoTransacao, TipoCliente, TipoParcela, StatusPagamento, StatusImovel, StatusLead, StatusVisita
 
 # Base com regras estritas de validação
 class ImovelBase(BaseModel):
@@ -97,4 +97,33 @@ class CorretorResponse(CorretorBase):
     ativo: bool
     # Repare: não há campo de senha aqui. O frontend nunca recebe a senha de volta.
 
+    model_config = ConfigDict(from_attributes=True)
+
+class LeadBase(BaseModel):
+    nome: str = Field(..., min_length=3)
+    telefone: str = Field(..., min_length=8)
+    interesse: Optional[str] = None
+    corretor_id: int
+
+class LeadCreate(LeadBase):
+    pass
+
+class LeadResponse(LeadBase):
+    id: int
+    status: StatusLead
+    model_config = ConfigDict(from_attributes=True)
+
+class VisitaBase(BaseModel):
+    data_visita: datetime
+    imovel_id: int
+    corretor_id: int
+    lead_id: int
+
+class VisitaCreate(VisitaBase):
+    pass
+
+class VisitaResponse(VisitaBase):
+    id: int
+    status: StatusVisita
+    feedback_comentario: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)

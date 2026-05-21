@@ -83,3 +83,28 @@ class Corretor(Base):
     # NUNCA salve a senha pura. 
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     ativo: Mapped[bool] = mapped_column(default=True)
+
+class Lead(Base):
+    __tablename__ = "leads"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    nome: Mapped[str] = mapped_column(String(100), nullable=False)
+    telefone: Mapped[str] = mapped_column(String(20), nullable=False)
+    interesse: Mapped[Optional[str]] = mapped_column(String(255))
+    status: Mapped[StatusLead] = mapped_column(SQLEnum(StatusLead), default=StatusLead.NOVO)
+    
+    # Qual corretor está cuidando desse lead?
+    corretor_id: Mapped[int] = mapped_column(ForeignKey("corretores.id"), nullable=False)
+
+class Visita(Base):
+    __tablename__ = "visitas"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    data_visita: Mapped[datetime] = mapped_column(nullable=False)
+    feedback_comentario: Mapped[Optional[str]] = mapped_column(String(500))
+    status: Mapped[StatusVisita] = mapped_column(SQLEnum(StatusVisita), default=StatusVisita.AGENDADA)
+    
+    # Amarrações do evento
+    imovel_id: Mapped[int] = mapped_column(ForeignKey("imoveis.id"), nullable=False)
+    corretor_id: Mapped[int] = mapped_column(ForeignKey("corretores.id"), nullable=False)
+    lead_id: Mapped[int] = mapped_column(ForeignKey("leads.id"), nullable=False)

@@ -27,3 +27,14 @@ class StatusPagamento(str, enum.Enum):
     PAGO = "PAGO"
     ATRASADO = "ATRASADO"
     CANCELADO = "CANCELADO"
+
+class StatusLead(str, enum.Enum):
+    NOVO = "NOVO"
+    EM_ATENDIMENTO = "EM_ATENDIMENTO"
+    CONVERTIDO = "CONVERTIDO"
+    PERDIDO = "PERDIDO"
+
+class StatusVisita(str, enum.Enum):
+    AGENDADA = "AGENDADA"
+    REALIZADA = "REALIZADA"
+    CANCELADA = "CANCELADA"
