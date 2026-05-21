@@ -1,35 +1,48 @@
 # main.py
-from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 import models
-import schemas
-from database import engine, SessionLocal
+from database import engine
+from routers import imovel_router, cliente_router, transacao_router, pagamento_router
 
-# Isso cria as tabelas no banco de dados automaticamente (útil para o MVP)
+# Cria as tabelas
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="API Imobiliária - ERP", version="1.0.0")
+app = FastAPI(
+    title="API Imobiliária - ERP", 
+    description="Sistema de gestão imobiliária com tratamento de erros globais.",
+    version="1.0.0"
+)
 
-# Dependência do banco de dados
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# Toda vez que qualquer rota disparar um IntegrityError, o FastAPI joga o erro para cá.
+@app.exception_handler(IntegrityError)
+async def integridade_referencial_handler(request: Request, exc: IntegrityError):
+    # Ao invés de um erro 500 caótico, devolvemos um erro 400 (Bad Request) limpo.
+    return JSONResponse(
+        status_code=400,
+        content={"detail": "Operação bloqueada: Este registro está vinculado a outros dados essenciais do sistema (ex: contratos ou históricos)."},
+    )
 
-# Rota POST: O Pydantic valida a entrada (ImovelCreate) e a saída (ImovelResponse)
-@app.post("/api/v1/imoveis", response_model=schemas.ImovelResponse)
-def criar_imovel(imovel: schemas.ImovelCreate, db: Session = Depends(get_db)):
-    
-    # 1. Neste ponto da execução, o Pydantic já garantiu que os dados estão corretos.
-    # 2. Desempacotamos o dicionário do Pydantic direto no modelo SQLAlchemy
-    db_imovel = models.Imovel(**imovel.model_dump())
-    
-    # 3. Adicionamos e 'comitamos' no banco
-    db.add(db_imovel)
-    db.commit()
-    db.refresh(db_imovel)
-    
-    # 4. Retornamos o objeto. O FastAPI, usando o response_model, converte de volta para JSON.
-    return db_imovel
+
+from routers import imovel_router, cliente_router, transacao_router
+
+models.Base.metadata.create_all(bind=engine)
+
+app = FastAPI(
+    title="API Imobiliária - ERP", 
+    version="1.0.0"
+)
+
+@app.exception_handler(IntegrityError)
+async def integridade_referencial_handler(request: Request, exc: IntegrityError):
+    return JSONResponse(
+        status_code=400,
+        content={"detail": "Operação bloqueada: Este registro está vinculado a outros dados essenciais do sistema."},
+    )
+
+# Acoplamento dos roteadores
+app.include_router(imovel_router.router)
+app.include_router(cliente_router.router)
+app.include_router(transacao_router.router)
+app.include_router(pagamento_router.router)
