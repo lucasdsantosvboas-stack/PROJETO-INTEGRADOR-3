@@ -9,6 +9,14 @@ from sqlalchemy import Date
 class Base(DeclarativeBase):
     pass
 
+class Usuario(Base):
+    __tablename__ = "usuarios"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    senha_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    ativo: Mapped[bool] = mapped_column(default=True)
+
 class Imovel(Base):
     __tablename__ = "imoveis"
 
