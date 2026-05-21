@@ -3,7 +3,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import Date, ForeignKey, String, Numeric, Enum as SQLEnum
 from typing import Optional
 from datetime import datetime
-from domain import TipoTransacao, StatusPagamento, StatusImovel, TipoCliente, TipoParcela
+from domain import TipoTransacao, StatusPagamento, StatusImovel, TipoCliente, TipoParcela, StatusLead, StatusVisita
 from sqlalchemy import Date
 
 class Base(DeclarativeBase):

@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 import models
 from database import engine
-from routers import imovel_router, cliente_router, transacao_router, pagamento_router, corretor_router
+from routers import auth_router, imovel_router, cliente_router, transacao_router, pagamento_router, corretor_router
 
 # Cria as tabelas no banco
 models.Base.metadata.create_all(bind=engine)

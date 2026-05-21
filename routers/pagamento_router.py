@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 import models
 import schemas
 from database import get_db
+from domain import StatusPagamento
 
 router = APIRouter(prefix="/api/v1/parcelas", tags=["Financeiro"])
 
@@ -41,9 +42,9 @@ def dar_baixa_parcela(parcela_id: int, baixa: schemas.PagamentoBaixa, db: Sessio
     db_parcela = db.query(models.PagamentoParcela).filter(models.PagamentoParcela.id == parcela_id).first()
     if not db_parcela:
         raise HTTPException(status_code=404, detail="Parcela não encontrada")
-    if db_parcela.status_pagamento == models.StatusPagamento.PAGO:
+    if db_parcela.status_pagamento == StatusPagamento.PAGO:
         raise HTTPException(status_code=400, detail="Esta parcela já consta como paga.")
-    db_parcela.status_pagamento = models.StatusPagamento.PAGO
+    db_parcela.status_pagamento = StatusPagamento.PAGO
     db_parcela.data_pagamento_efetivo = baixa.data_pagamento_efetivo
     db.commit()
     db.refresh(db_parcela)

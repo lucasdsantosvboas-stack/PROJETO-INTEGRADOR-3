@@ -1,7 +1,7 @@
 # auth.py
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import hashlib
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -12,14 +12,13 @@ SECRET_KEY = "erp-imobiliaria-secret-key-2024"
 ALGORITHM  = "HS256"
 TOKEN_EXPIRE_HOURS = 8
 
-pwd_context    = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme  = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 def hash_senha(senha: str) -> str:
-    return pwd_context.hash(senha)
+    return hashlib.sha256(senha.encode()).hexdigest()
 
 def verificar_senha(senha: str, hash: str) -> bool:
-    return pwd_context.verify(senha, hash)
+    return hashlib.sha256(senha.encode()).hexdigest() == hash
 
 def criar_token(data: dict) -> str:
     payload = data.copy()

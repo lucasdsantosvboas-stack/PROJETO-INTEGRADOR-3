@@ -27,7 +27,6 @@ class ImovelResponse(ImovelBase):
 class ImovelUpdateStatus(BaseModel):
     status: StatusImovel
 
-from domain import TipoCliente
 
 class ClienteBase(BaseModel):
     nome: str = Field(..., min_length=3, max_length=100, description="Nome completo ou Razão Social")
@@ -127,3 +126,15 @@ class VisitaResponse(VisitaBase):
     status: StatusVisita
     feedback_comentario: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
+
+class UsuarioCreate(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50)
+    password: str = Field(..., min_length=8)
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str

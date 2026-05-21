@@ -1,7 +1,7 @@
 # database.py
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Date, ForeignKey, Enum
-from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
 
 # String de conexão. O SQLite criará um arquivo local chamado 'imobiliaria.db'
 SQLALCHEMY_DATABASE_URL = "sqlite:///./imobiliaria.db"

@@ -403,7 +403,7 @@ ui.add_head_html('''
   .q-dialog__inner { align-items: center !important; justify-content: center !important; }
   .q-dialog__inner > div { margin: auto !important; }
 </style>
-''')
+''', shared=True)
 
 # token em memória para a sessão
 session = {"token": None, "username": None}
@@ -431,11 +431,6 @@ def login_page():
                 ui.notify(r.json().get("detail", "Credenciais inválidas"), type="negative")
         except Exception as e:
             ui.notify(f"Falha de conexão: {e}", type="negative")
-
-    ui.add_head_html('''
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>* { font-family: "Inter", sans-serif !important; } .q-icon { display:none !important; }</style>
-    ''')
 
     with ui.column().style("min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0f172a"):
         with ui.card().style("width:380px;border-radius:24px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)"):
