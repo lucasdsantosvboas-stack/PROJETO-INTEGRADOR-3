@@ -1,10 +1,10 @@
-# main.py
+# Configuração principal da API
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 import models
 from database import engine
-from routers import auth_router, imovel_router, cliente_router, transacao_router, pagamento_router, corretor_router
+from routers import auth_router, imovel_router, cliente_router, transacao_router, pagamento_router, corretor_router, lead_router
 
 # Cria as tabelas no banco
 models.Base.metadata.create_all(bind=engine)
@@ -29,3 +29,4 @@ app.include_router(cliente_router.router)
 app.include_router(transacao_router.router)
 app.include_router(pagamento_router.router)
 app.include_router(corretor_router.router)
+app.include_router(lead_router.router)

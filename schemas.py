@@ -1,4 +1,4 @@
-# schemas.py
+# Modelos de validação de dados da API (Esquemas do Pydantic)
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import Optional
 from datetime import datetime, date

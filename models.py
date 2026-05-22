@@ -1,4 +1,4 @@
-# models.py
+# Tabelas do banco de dados (Modelos do SQLAlchemy)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import Date, ForeignKey, String, Numeric, Enum as SQLEnum
 from typing import Optional

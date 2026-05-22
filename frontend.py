@@ -1,4 +1,4 @@
-# frontend.py
+# Interface de usuário (Frontend)
 from nicegui import ui
 import httpx
 from datetime import date
@@ -45,7 +45,7 @@ def dlg(title: str, color: str):
             ui.label(title).style("color:white;font-size:17px;font-weight:700")
     return d
 
-# ── helpers ───────────────────────────────────────────────────────────────────
+# ── FUNÇÕES AUXILIARES ────────────────────────────────────────────────────────
 
 async def api_get(path):
     try:
@@ -390,7 +390,109 @@ def build_financeiro():
 
     ui.timer(0.1, refresh, once=True)
 
-# ── SHELL ─────────────────────────────────────────────────────────────────────
+# ── CORRETORES ────────────────────────────────────────────────────────────────
+
+def build_corretores():
+    async def refresh():
+        lista.clear()
+        items = await api_get("/corretores/")
+        with lista:
+            if not items:
+                ui.label("Nenhum corretor cadastrado.").classes("text-gray-400 py-8 text-center w-full")
+                return
+            for cr in items:
+                status_color = "background:#dcfce7;color:#166534" if cr.get("ativo") else "background:#fee2e2;color:#991b1b"
+                status_text = "ATIVO" if cr.get("ativo") else "INATIVO"
+                with ui.card().style("flex:0 0 calc(33.333% - 11px);width:calc(33.333% - 11px);border-radius:16px;border:1px solid #f1f5f9;box-shadow:0 1px 4px rgba(0,0,0,.06)").classes("hover:shadow-md transition-shadow"):
+                    with ui.card_section():
+                        with ui.row().classes("justify-between items-center w-full"):
+                            with ui.column().classes("gap-0"):
+                                ui.label(cr["nome"]).classes("font-semibold text-gray-800")
+                                ui.label(cr["email"]).classes("text-sm text-gray-500")
+                                ui.label(f"CRECI: {cr['registro_profissional']}").classes("text-xs text-gray-400 mt-1")
+                            tag(status_text, status_color)
+
+    async def do_create():
+        if len(f_nome.value or "") < 3: ui.notify("Nome: mín. 3 caracteres", type="warning"); return
+        if len(f_senha.value or "") < 8: ui.notify("Senha: mín. 8 caracteres", type="warning"); return
+        r = await api_post("/corretores/", {"nome": f_nome.value, "email": f_email.value, "registro_profissional": f_creci.value, "senha": f_senha.value})
+        if ok(r, "Corretor criado!"): dlg_c.close(); await refresh()
+
+    section_header("Corretores", "+ Novo Corretor", "blue-grey", lambda: dlg_c.open())
+    lista = ui.element("div").style("display:flex;flex-wrap:wrap;gap:16px;width:100%")
+
+    with ui.dialog().props("persistent") as dlg_c, ui.card().style(CARD_STYLE):
+        with ui.element("div").style("background:#64748b;padding:16px 20px;border-radius:20px 20px 0 0"):
+            ui.label("Novo Corretor").style("color:white;font-size:17px;font-weight:700")
+        with ui.column().style("padding:16px 20px;gap:12px;width:100%"):
+            f_nome  = ui.input("Nome completo").props("outlined dense").classes("w-full")
+            f_email = ui.input("E-mail").props("outlined dense").classes("w-full")
+            f_creci = ui.input("Registro Profissional (CRECI)").props("outlined dense").classes("w-full")
+            f_senha = ui.input("Senha de Acesso", password=True).props("outlined dense type=password").classes("w-full")
+        modal_actions(dlg_c, do_create, "blue-grey")
+
+    ui.timer(0.1, refresh, once=True)
+
+# ── LEADS ─────────────────────────────────────────────────────────────────────
+
+def build_leads():
+    corretores_map: dict[int, str] = {}
+
+    async def refresh():
+        lista.clear()
+        corretores = await api_get("/corretores/")
+        corretores_map.clear()
+        corretores_map.update({c["id"]: c["nome"] for c in corretores})
+        
+        items = await api_get("/leads/")
+        with lista:
+            if not items:
+                ui.label("Nenhum lead registrado.").classes("text-gray-400 py-8 text-center w-full")
+                return
+            for ld in items:
+                corretor_nome = corretores_map.get(ld["corretor_id"], f"Corretor #{ld['corretor_id']}")
+                with ui.card().style("flex:0 0 calc(33.333% - 11px);width:calc(33.333% - 11px);border-radius:16px;border:1px solid #f1f5f9;box-shadow:0 1px 4px rgba(0,0,0,.06)").classes("hover:shadow-md transition-shadow"):
+                    with ui.card_section():
+                        with ui.row().classes("justify-between items-start w-full"):
+                            with ui.column().classes("gap-0"):
+                                ui.label(ld["nome"]).classes("font-semibold text-gray-800")
+                                ui.label(ld["telefone"]).classes("text-sm text-gray-500")
+                                ui.label(f"Interesse: {ld.get('interesse') or 'Não informado'}").classes("text-xs text-gray-400 mt-1")
+                                ui.label(f"Corretor: {corretor_nome}").classes("text-xs text-blue-500 mt-1 font-medium")
+                            tag(ld["status"], "background:#fef3c7;color:#b45309")
+
+    async def open_modal():
+        corretores = await api_get("/corretores/")
+        f_corretor.options = {c["id"]: c["nome"] for c in corretores}
+        f_corretor.value = None
+        f_corretor.update()
+        dlg_c.open()
+
+    async def do_create():
+        if len(f_nome.value or "") < 3: ui.notify("Nome: mín. 3 caracteres", type="warning"); return
+        if len(f_telefone.value or "") < 8: ui.notify("Telefone: mín. 8 caracteres", type="warning"); return
+        if not f_corretor.value: ui.notify("Selecione um corretor", type="warning"); return
+        
+        dados = {"nome": f_nome.value, "telefone": f_telefone.value, "interesse": f_interesse.value, "corretor_id": int(f_corretor.value)}
+        r = await api_post("/leads/", dados)
+        if ok(r, "Lead registrado!"): dlg_c.close(); await refresh()
+
+    section_header("Leads", "+ Novo Lead", "amber-8", open_modal)
+    lista = ui.element("div").style("display:flex;flex-wrap:wrap;gap:16px;width:100%")
+
+    with ui.dialog().props("persistent") as dlg_c, ui.card().style(CARD_STYLE):
+        with ui.element("div").style("background:#d97706;padding:16px 20px;border-radius:20px 20px 0 0"):
+            ui.label("Novo Lead").style("color:white;font-size:17px;font-weight:700")
+        with ui.column().style("padding:16px 20px;gap:12px;width:100%"):
+            f_nome      = ui.input("Nome do Lead").props("outlined dense").classes("w-full")
+            f_telefone  = ui.input("Telefone").props("outlined dense").classes("w-full")
+            f_interesse = ui.input("Interesse (ex: Comprar casa)").props("outlined dense").classes("w-full")
+            f_corretor  = ui.select({}, label="Atribuir ao Corretor").props("outlined dense use-input input-debounce=0 clearable").classes("w-full")
+        modal_actions(dlg_c, do_create, "amber-8")
+
+    ui.timer(0.1, refresh, once=True)
+
+# ── ESTRUTURA BASE DA PÁGINA ──────────────────────────────────────────────────
 
 ui.add_head_html('''
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -411,7 +513,7 @@ session = {"token": None, "username": None}
 def get_headers():
     return {"Authorization": f"Bearer {session['token']}"} if session["token"] else {}
 
-# ── LOGIN PAGE ────────────────────────────────────────────────────────────────
+# ── TELA DE LOGIN ─────────────────────────────────────────────────────────────
 
 @ui.page("/login")
 def login_page():
@@ -443,7 +545,7 @@ def login_page():
                 ui.button("Entrar", on_click=do_login).props("color=primary unelevated rounded").classes("w-full").style("height:44px;font-size:15px;font-weight:600")
                 ui.label("Acesso restrito ao sistema").style("color:#94a3b8;font-size:11px;text-align:center")
 
-# ── MAIN PAGE ─────────────────────────────────────────────────────────────────
+# ── TELA PRINCIPAL ────────────────────────────────────────────────────────────
 
 @ui.page("/")
 def main_page():
@@ -473,6 +575,8 @@ def main_page():
                 t2 = ui.tab("Clientes")
                 t3 = ui.tab("Transações")
                 t4 = ui.tab("Financeiro")
+                t5 = ui.tab("Corretores")
+                t6 = ui.tab("Leads")
 
         with ui.tab_panels(tabs, value=t1).classes("w-full bg-transparent"):
             with ui.tab_panel(t1).classes("p-0 pt-2"):
@@ -483,5 +587,9 @@ def main_page():
                 build_transacoes()
             with ui.tab_panel(t4).classes("p-0 pt-2"):
                 build_financeiro()
+            with ui.tab_panel(t5).classes("p-0 pt-2"):
+                build_corretores()
+            with ui.tab_panel(t6).classes("p-0 pt-2"):
+                build_leads()
 
 ui.run(title="ERP Imobiliária", dark=False, port=8080)

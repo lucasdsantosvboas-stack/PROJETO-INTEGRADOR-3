@@ -1,4 +1,4 @@
-# domain.py
+# Regras de domínio (Enums e constantes)
 import enum
 
 class StatusImovel(str, enum.Enum):

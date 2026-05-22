@@ -3,12 +3,9 @@ from sqlalchemy.orm import Session
 import models
 import schemas
 from database import get_db
+from auth import hash_senha
 
 router = APIRouter(prefix="/api/v1/corretores", tags=["Corretores & Acesso"])
-
-# Função simulada de Hash (em produção, use bcrypt via passlib)
-def gerar_hash_senha(senha: str) -> str:
-    return f"fake_hash_{senha}" # Substituiremos isso depois
 
 @router.post("/", response_model=schemas.CorretorResponse, status_code=status.HTTP_201_CREATED)
 def registrar_corretor(corretor: schemas.CorretorCreate, db: Session = Depends(get_db)):
@@ -24,7 +21,7 @@ def registrar_corretor(corretor: schemas.CorretorCreate, db: Session = Depends(g
     # 3. Cria o modelo com a senha hasheada
     db_corretor = models.Corretor(
         **dados_corretor,
-        hashed_password=gerar_hash_senha(senha_pura)
+        hashed_password=hash_senha(senha_pura)
     )
     
     db.add(db_corretor)
