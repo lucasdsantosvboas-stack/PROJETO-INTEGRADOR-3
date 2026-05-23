@@ -3,7 +3,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import Date, ForeignKey, String, Numeric, Enum as SQLEnum
 from typing import Optional
 from datetime import datetime
-from domain import TipoTransacao, StatusPagamento, StatusImovel, TipoCliente, TipoParcela, StatusLead, StatusVisita
+from domain import TipoTransacao, StatusPagamento, StatusImovel, TipoCliente, TipoParcela, StatusLead, StatusVisita, TipoImovel
 from sqlalchemy import Date
 
 class Base(DeclarativeBase):
@@ -27,6 +27,10 @@ class Imovel(Base):
     preco_atual: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False) 
     status: Mapped[StatusImovel] = mapped_column(SQLEnum(StatusImovel), default=StatusImovel.DISPONIVEL)
     endereco: Mapped[str] = mapped_column(String(255), nullable=False)
+    foto_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # Caminho relativo da foto
+    bairro: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # Bairro para filtro
+    tipo_imovel: Mapped[Optional[TipoImovel]] = mapped_column(SQLEnum(TipoImovel), nullable=True)  # Tipo: Apartamento, Casa, etc
+    tipo_transacao: Mapped[Optional[TipoTransacao]] = mapped_column(SQLEnum(TipoTransacao), nullable=True)  # VENDA, ALUGUEL ou ambos
 
 class HistoricoStatus(Base):
     __tablename__ = "historico_status"
@@ -45,6 +49,12 @@ class Cliente(Base):
     nome: Mapped[str] = mapped_column(String(100), nullable=False)
     contato: Mapped[str] = mapped_column(String(50), nullable=False)
     tipo: Mapped[TipoCliente] = mapped_column(SQLEnum(TipoCliente), nullable=False)
+    cpf: Mapped[Optional[str]] = mapped_column(String(11), unique=True, nullable=True, index=True)  # Validado com brutils, None para PJ
+    cpf_valido: Mapped[bool] = mapped_column(default=False)  # Flag para histórico de validação
+    bairro: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    cidade: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    uf: Mapped[Optional[str]] = mapped_column(String(2), nullable=True)
+    logradouro: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
 class Transacao(Base):
     __tablename__ = "transacoes"

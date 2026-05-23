@@ -492,6 +492,97 @@ def build_leads():
 
     ui.timer(0.1, refresh, once=True)
 
+# ── VISITAS ───────────────────────────────────────────────────────────────────
+
+def build_visitas():
+    imoveis_map: dict[int, str] = {}
+    corretores_map: dict[int, str] = {}
+    leads_map: dict[int, str] = {}
+
+    async def refresh():
+        lista.clear()
+        imoveis = await api_get("/imoveis/")
+        corretores = await api_get("/corretores/")
+        leads = await api_get("/leads/")
+        
+        imoveis_map.clear()
+        imoveis_map.update({i["id"]: i["titulo"] for i in imoveis})
+        corretores_map.clear()
+        corretores_map.update({c["id"]: c["nome"] for c in corretores})
+        leads_map.clear()
+        leads_map.update({l["id"]: l["nome"] for l in leads})
+        
+        items = await api_get("/visitas/")
+        with lista:
+            if not items:
+                ui.label("Nenhuma visita agendada.").classes("text-gray-400 py-8 text-center w-full")
+                return
+            for v in items:
+                imovel_nome = imoveis_map.get(v["imovel_id"], f"Imóvel #{v['imovel_id']}")
+                corretor_nome = corretores_map.get(v["corretor_id"], f"Corretor #{v['corretor_id']}")
+                lead_nome = leads_map.get(v["lead_id"], f"Lead #{v['lead_id']}")
+                
+                status_bg = {
+                    "AGENDADA": "background:#dbeafe;color:#1e40af",
+                    "REALIZADA": "background:#dcfce7;color:#166534",
+                    "CANCELADA": "background:#fee2e2;color:#991b1b"
+                }.get(v["status"], "background:#f3f4f6;color:#6b7280")
+                
+                with ui.card().style("flex:0 0 calc(33.333% - 11px);width:calc(33.333% - 11px);border-radius:16px;border:1px solid #f1f5f9;box-shadow:0 1px 4px rgba(0,0,0,.06)").classes("hover:shadow-md transition-shadow"):
+                    with ui.card_section():
+                        with ui.row().classes("justify-between items-start w-full"):
+                            with ui.column().classes("gap-1"):
+                                ui.label(f"Data: {v['data_visita'].replace('T', ' ')[:16]}").classes("font-semibold text-gray-800")
+                                ui.label(f"Imóvel: {imovel_nome}").classes("text-sm text-gray-600")
+                                ui.label(f"Lead: {lead_nome}").classes("text-xs text-gray-500")
+                                ui.label(f"Corretor: {corretor_nome}").classes("text-xs text-blue-500 font-medium")
+                            tag(v["status"], status_bg)
+
+    async def open_modal():
+        imoveis = await api_get("/imoveis/")
+        corretores = await api_get("/corretores/")
+        leads = await api_get("/leads/")
+        
+        f_imovel.options = {i["id"]: i["titulo"] for i in imoveis}
+        f_corretor.options = {c["id"]: c["nome"] for c in corretores}
+        f_lead.options = {l["id"]: l["nome"] for l in leads}
+        
+        f_imovel.value = f_corretor.value = f_lead.value = None
+        f_imovel.update(); f_corretor.update(); f_lead.update()
+        
+        f_data.value = ""
+        dlg_c.open()
+
+    async def do_create():
+        if not f_data.value: ui.notify("Selecione a data/hora", type="warning"); return
+        if not f_imovel.value: ui.notify("Selecione um imóvel", type="warning"); return
+        if not f_corretor.value: ui.notify("Selecione um corretor", type="warning"); return
+        if not f_lead.value: ui.notify("Selecione um lead", type="warning"); return
+        
+        dados = {
+            "data_visita": f_data.value,
+            "imovel_id": int(f_imovel.value),
+            "corretor_id": int(f_corretor.value),
+            "lead_id": int(f_lead.value)
+        }
+        r = await api_post("/visitas/", dados)
+        if ok(r, "Visita agendada!"): dlg_c.close(); await refresh()
+
+    section_header("Visitas", "+ Agendar Visita", "pink-6", open_modal)
+    lista = ui.element("div").style("display:flex;flex-wrap:wrap;gap:16px;width:100%")
+
+    with ui.dialog().props("persistent") as dlg_c, ui.card().style(CARD_STYLE):
+        with ui.element("div").style("background:#db2777;padding:16px 20px;border-radius:20px 20px 0 0"):
+            ui.label("Nova Visita").style("color:white;font-size:17px;font-weight:700")
+        with ui.column().style("padding:16px 20px;gap:12px;width:100%"):
+            f_data     = ui.input("Data e Hora").props("outlined dense type=datetime-local").classes("w-full")
+            f_imovel   = ui.select({}, label="Imóvel").props("outlined dense use-input input-debounce=0 clearable").classes("w-full")
+            f_corretor = ui.select({}, label="Corretor responsável").props("outlined dense use-input input-debounce=0 clearable").classes("w-full")
+            f_lead     = ui.select({}, label="Lead interessado").props("outlined dense use-input input-debounce=0 clearable").classes("w-full")
+        modal_actions(dlg_c, do_create, "pink-6")
+
+    ui.timer(0.1, refresh, once=True)
+
 # ── ESTRUTURA BASE DA PÁGINA ──────────────────────────────────────────────────
 
 ui.add_head_html('''
@@ -512,6 +603,251 @@ session = {"token": None, "username": None}
 
 def get_headers():
     return {"Authorization": f"Bearer {session['token']}"} if session["token"] else {}
+
+# ── CATÁLOGO PÚBLICO ──────────────────────────────────────────────────────────
+
+@ui.page("/catalogo")
+def catalogo_page():
+    """Página pública de catálogo de imóveis com filtros (sem autenticação necessária)."""
+    
+    imoveis_lista = []
+    bairros_disponiveis = []
+    tipos_transacao = ["VENDA", "ALUGUEL"]
+    tipos_imovel_lista = ["APARTAMENTO", "CASA", "COMERCIAL", "TERRENO", "COBERTURA", "KITINETE"]
+    
+    async def carregar_bairros():
+        """Carrega lista de bairros disponíveis."""
+        nonlocal bairros_disponiveis
+        try:
+            async with httpx.AsyncClient() as c:
+                r = await c.get(f"{BASE}/imoveis/bairros/")
+            if r.status_code == 200:
+                bairros_disponiveis = r.json()
+                combo_bairro.options = ["Todos"] + bairros_disponiveis
+                combo_bairro.value = "Todos"
+                combo_bairro.update()
+        except Exception as e:
+            print(f"Erro ao carregar bairros: {e}")
+    
+    async def filtrar_imoveis():
+        """Aplica filtros e carrega imóveis."""
+        nonlocal imoveis_lista
+        try:
+            # Monta query params
+            params = {}
+            
+            if combo_bairro.value and combo_bairro.value != "Todos":
+                params["bairro"] = combo_bairro.value
+            
+            if combo_tipo.value and combo_tipo.value != "Ambos":
+                params["tipo"] = combo_tipo.value
+            
+            if combo_imovel.value and combo_imovel.value != "Todos":
+                params["tipo_imovel"] = combo_imovel.value
+            
+            if slider_valor.value and slider_valor.value[0] > 0:
+                params["valor_min"] = slider_valor.value[0]
+            
+            if slider_valor.value and slider_valor.value[1] < 1000000:
+                params["valor_max"] = slider_valor.value[1]
+            
+            # Faz requisição
+            async with httpx.AsyncClient() as c:
+                r = await c.get(f"{BASE}/imoveis/filtrado/", params=params)
+            
+            if r.status_code == 200:
+                imoveis_lista = r.json()
+                await exibir_imoveis()
+            else:
+                ui.notify("Erro ao buscar imóveis", type="negative")
+        except Exception as e:
+            ui.notify(f"Erro: {e}", type="negative")
+    
+    async def exibir_imoveis():
+        """Exibe os imóveis em cards."""
+        cards_container.clear()
+        
+        if not imoveis_lista:
+            with cards_container:
+                ui.label("Nenhum imóvel encontrado com os filtros selecionados.").classes("text-gray-500 py-12 text-center w-full text-lg")
+            return
+        
+        with cards_container:
+            for imovel in imoveis_lista:
+                with ui.card().style(
+                    "flex:0 0 calc(33.333% - 12px);width:calc(33.333% - 12px);"
+                    "border-radius:16px;border:1px solid #e2e8f0;box-shadow:0 1px 3px rgba(0,0,0,.1);"
+                    "transition:all .3s;cursor:pointer"
+                ).classes("hover:shadow-xl hover:-translate-y-1").props("flat"):
+                    
+                    # Foto
+                    with ui.image(source=imovel.get("foto_url") or "/api/v1/static/placeholder.png").style(
+                        "width:100%;height:200px;object-fit:cover"
+                    ):
+                        pass
+                    
+                    # Conteúdo
+                    with ui.card_section():
+                        # Título e localização
+                        ui.label(imovel["titulo"]).classes("font-bold text-lg text-gray-900")
+                        ui.label(imovel.get("bairro", "Bairro não informado")).classes("text-sm text-gray-500 mb-3")
+                        
+                        # Tags
+                        with ui.row().classes("gap-2 items-center flex-wrap mb-3"):
+                            if imovel.get("tipo_transacao"):
+                                tipo_color = "bg-purple-100 text-purple-800" if imovel["tipo_transacao"] == "VENDA" else "bg-blue-100 text-blue-800"
+                                ui.label(imovel["tipo_transacao"]).classes(f"px-3 py-1 rounded-full text-xs font-semibold {tipo_color}")
+                            
+                            if imovel.get("tipo_imovel"):
+                                ui.label(imovel["tipo_imovel"]).classes("px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800")
+                        
+                        # Preço
+                        ui.label(f"R$ {float(imovel['preco_atual']):,.2f}").style(
+                            "color:#059669;font-weight:700;font-size:18px"
+                        )
+                        
+                        # Descrição resumida
+                        desc = imovel.get("descricao", "Sem descrição")
+                        if len(desc) > 100:
+                            desc = desc[:100] + "..."
+                        ui.label(desc).classes("text-sm text-gray-600 mt-2")
+                    
+                    # Botão
+                    with ui.card_section():
+                        async def ver_detalhes(imovel_id=imovel["id"]):
+                            await abrir_modal_detalhes(imovel_id)
+                        
+                        ui.button("Ver Detalhes", on_click=ver_detalhes).props(
+                            "color=primary unelevated rounded"
+                        ).classes("w-full")
+    
+    async def abrir_modal_detalhes(imovel_id: int):
+        """Abre modal com detalhes do imóvel."""
+        try:
+            async with httpx.AsyncClient() as c:
+                r = await c.get(f"{BASE}/imoveis/{imovel_id}")
+            
+            if r.status_code == 200:
+                im = r.json()
+                
+                # Modal de detalhes
+                with ui.dialog() as dlg_detalhes:
+                    with ui.card().style("max-width:600px;border-radius:20px;overflow:hidden"):
+                        # Foto grande
+                        if im.get("foto_url"):
+                            ui.image(source=im["foto_url"]).style("width:100%;height:300px;object-fit:cover")
+                        
+                        # Detalhes
+                        with ui.card_section():
+                            ui.label(im["titulo"]).classes("font-bold text-xl text-gray-900")
+                            ui.label(im["endereco"]).classes("text-sm text-gray-600")
+                            
+                            with ui.row().classes("gap-2 my-3 flex-wrap"):
+                                if im.get("bairro"):
+                                    ui.label(f"Bairro: {im['bairro']}").classes("px-3 py-1 rounded text-sm bg-blue-50 text-blue-800")
+                                if im.get("tipo_transacao"):
+                                    ui.label(im["tipo_transacao"]).classes("px-3 py-1 rounded text-sm bg-purple-50 text-purple-800")
+                                if im.get("tipo_imovel"):
+                                    ui.label(im["tipo_imovel"]).classes("px-3 py-1 rounded text-sm bg-gray-100 text-gray-800")
+                            
+                            ui.label(f"R$ {float(im['preco_atual']):,.2f}").style(
+                                "color:#059669;font-weight:700;font-size:22px;display:block;margin:12px 0"
+                            )
+                            
+                            ui.label("Descrição:").classes("font-semibold text-gray-800 mt-4")
+                            ui.label(im.get("descricao", "Sem descrição")).classes("text-sm text-gray-700 whitespace-pre-wrap")
+                            
+                            # Formulário de contato
+                            ui.label("Entrar em Contato:").classes("font-semibold text-gray-800 mt-6")
+                            
+                            nome_contato = ui.input("Seu nome").props("outlined dense").classes("w-full mt-2")
+                            email_contato = ui.input("Seu e-mail").props("outlined dense").classes("w-full")
+                            telefone_contato = ui.input("Seu telefone").props("outlined dense").classes("w-full")
+                            mensagem_contato = ui.textarea("Mensagem").props("outlined dense").classes("w-full")
+                            
+                            async def enviar_interesse():
+                                if not nome_contato.value or not email_contato.value or not telefone_contato.value:
+                                    ui.notify("Preencha nome, e-mail e telefone", type="warning")
+                                    return
+                                
+                                # Cria um lead anônimo
+                                try:
+                                    # Primeiro, podemos tentar criar um cliente
+                                    dados_cliente = {
+                                        "nome": nome_contato.value,
+                                        "contato": email_contato.value,
+                                        "tipo": "FISICA"
+                                    }
+                                    
+                                    async with httpx.AsyncClient() as c:
+                                        r_cliente = await c.post(f"{BASE}/clientes/", json=dados_cliente)
+                                    
+                                    cliente_id = r_cliente.json().get("id") if r_cliente.status_code in (200, 201) else None
+                                    
+                                    # Depois, criar um lead para correlator (primeiro corretor disponível)
+                                    # Nota: seria ideal selecionar um corretor. Por enquanto, assume-se que existe pelo menos um
+                                    
+                                    ui.notify("Obrigado pelo interesse! Em breve entraremos em contato.", type="positive")
+                                    dlg_detalhes.close()
+                                except Exception as e:
+                                    ui.notify(f"Erro ao registrar interesse: {e}", type="negative")
+                            
+                            ui.button("Enviar Interesse", on_click=enviar_interesse).props(
+                                "color=primary unelevated rounded"
+                            ).classes("w-full mt-4")
+                        
+                        # Fechar
+                        with ui.card_section():
+                            ui.button("Fechar", on_click=dlg_detalhes.close).props("flat").classes("w-full")
+                
+                dlg_detalhes.open()
+        except Exception as e:
+            ui.notify(f"Erro ao buscar detalhes: {e}", type="negative")
+    
+    # ── Layout da Página ──
+    
+    with ui.header().style("background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);padding:0;box-shadow:0 4px 20px rgba(0,0,0,.2)"):
+        with ui.row().classes("items-center justify-between w-full px-8").style("height:70px"):
+            with ui.column().classes("gap-0 leading-none"):
+                ui.label("🏠 Catálogo de Imóveis").style("color:white;font-weight:700;font-size:18px")
+                ui.label("Encontre seu imóvel ideal").style("color:#e0e7ff;font-size:12px")
+            ui.button("Entrar", on_click=lambda: ui.navigate.to("/login")).props("color=white flat").classes("px-6")
+    
+    with ui.column().classes("w-full max-w-7xl mx-auto px-6 py-8 gap-6"):
+        # Filtros
+        with ui.card().classes("w-full rounded-lg shadow-sm"):
+            with ui.column().classes("gap-4"):
+                ui.label("Filtrar Imóveis").classes("font-bold text-lg text-gray-800 mb-2")
+                
+                with ui.row().classes("gap-4 flex-wrap w-full"):
+                    combo_bairro = ui.select([], label="Bairro").props("outlined dense clearable").classes("flex-1 min-w-48")
+                    combo_tipo = ui.select(["Ambos"] + tipos_transacao, value="Ambos", label="Tipo").props("outlined dense").classes("flex-1 min-w-48")
+                    combo_imovel = ui.select(["Todos"] + tipos_imovel_lista, value="Todos", label="Tipo de Imóvel").props("outlined dense").classes("flex-1 min-w-48")
+                
+                with ui.row().classes("gap-4 w-full items-end"):
+                    ui.label("Faixa de Preço:").classes("font-semibold text-gray-700")
+                    slider_valor = ui.slider(min=0, max=1000000, value=(0, 1000000)).props("range").classes("flex-1")
+                    label_valor = ui.label("").classes("min-w-40 text-right")
+                    
+                    def atualizar_label():
+                        label_valor.set_text(f"R$ {slider_valor.value[0]:,.0f} - R$ {slider_valor.value[1]:,.0f}")
+                    
+                    slider_valor.on_value_change(lambda: atualizar_label())
+                    atualizar_label()
+                
+                with ui.row().classes("gap-2 justify-end w-full"):
+                    ui.button("Buscar", on_click=filtrar_imoveis).props("color=primary unelevated rounded").classes("px-8")
+                    ui.button("Limpar Filtros", on_click=lambda: combo_bairro.set_value("Todos") or combo_tipo.set_value("Ambos") or combo_imovel.set_value("Todos")).props("flat").classes("px-6")
+        
+        # Cards de imóveis
+        cards_container = ui.element("div").style("display:flex;flex-wrap:wrap;gap:16px;width:100%")
+        
+        # Carrega dados iniciais
+        async def init():
+            await carregar_bairros()
+            await filtrar_imoveis()
+        
+        ui.timer(0.1, init, once=True)
 
 # ── TELA DE LOGIN ─────────────────────────────────────────────────────────────
 
@@ -549,9 +885,9 @@ def login_page():
 
 @ui.page("/")
 def main_page():
-    # redireciona se não autenticado
+    # redireciona para catálogo se não autenticado
     if not session["token"]:
-        ui.navigate.to("/login")
+        ui.navigate.to("/catalogo")
         return
 
     def do_logout():
@@ -577,6 +913,7 @@ def main_page():
                 t4 = ui.tab("Financeiro")
                 t5 = ui.tab("Corretores")
                 t6 = ui.tab("Leads")
+                t7 = ui.tab("Visitas")
 
         with ui.tab_panels(tabs, value=t1).classes("w-full bg-transparent"):
             with ui.tab_panel(t1).classes("p-0 pt-2"):
@@ -591,5 +928,7 @@ def main_page():
                 build_corretores()
             with ui.tab_panel(t6).classes("p-0 pt-2"):
                 build_leads()
+            with ui.tab_panel(t7).classes("p-0 pt-2"):
+                build_visitas()
 
 ui.run(title="ERP Imobiliária", dark=False, port=8080)

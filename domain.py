@@ -38,3 +38,11 @@ class StatusVisita(str, enum.Enum):
     AGENDADA = "AGENDADA"
     REALIZADA = "REALIZADA"
     CANCELADA = "CANCELADA"
+
+class TipoImovel(str, enum.Enum):
+    APARTAMENTO = "APARTAMENTO"
+    CASA = "CASA"
+    COMERCIAL = "COMERCIAL"
+    TERRENO = "TERRENO"
+    COBERTURA = "COBERTURA"
+    KITINETE = "KITINETE"
