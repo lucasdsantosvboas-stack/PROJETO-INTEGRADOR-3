@@ -1,0 +1,52 @@
+:root {
+    /* Variáveis Globais de Cores (Centralizadas) */
+    --primary-color: #667eea;
+    --primary-dark: #5a67d8;
+    --bg-light: #f8fafc;
+    --bg-dark: #1e293b;
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
+    --border-color: #e2e8f0;
+    
+    /* Tipografia */
+    --font-primary: "Inter", sans-serif;
+}
+
+/* Regra responsiva base para os cards nas listagens (Desktop: 3 colunas) */
+.responsive-card {
+    flex: 0 0 calc(33.333% - 11px);
+    width: calc(33.333% - 11px);
+}
+
+/* Variação para o grid do Catálogo */
+.catalogo-card {
+    flex: 0 0 calc(33.333% - 12px);
+    width: calc(33.333% - 12px);
+}
+
+/* Responsividade para Tablets / Telas Médias (2 Colunas) */
+@media (max-width: 1024px) {
+    .responsive-card, .catalogo-card {
+        flex: 0 0 calc(50% - 8px) !important;
+        width: calc(50% - 8px) !important;
+    }
+}
+
+/* Responsividade para Smartphones (1 Coluna e Ajustes finos) */
+@media (max-width: 640px) {
+    .responsive-card, .catalogo-card {
+        flex: 0 0 100% !important;
+        width: 100% !important;
+    }
+    
+    /* Permite rolagem horizontal agradável para as abas em telas pequenas */
+    .q-tabs__content {
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .q-tab {
+        padding: 0 12px !important;
+    }
+}

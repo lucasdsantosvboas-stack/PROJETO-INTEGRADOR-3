@@ -1,9 +1,22 @@
 # Interface de usuário (Frontend)
 from nicegui import ui
+from nicegui import ui, app
 import httpx
 from datetime import date
 
 BASE = "http://localhost:8000/api/v1"
+
+# Permite que o NiceGUI encontre e sirva os arquivos da pasta 'static' (ex: theme.css)
+app.add_static_files('/static', 'static')
+
+# ── TEMA GLOBAL ────────────────────────────────────────────────────────────────
+PRIMARY_COLOR = "#667eea"
+PRIMARY_DARK = "#5a67d8"
+BG_LIGHT = "#f8fafc"
+BG_DARK = "#1e293b"
+TEXT_PRIMARY = "#0f172a"
+TEXT_SECONDARY = "#64748b"
+BORDER_COLOR = "#e2e8f0"
 
 STATUS_BG = {
     "DISPONIVEL": "background:#dcfce7;color:#166534",
@@ -27,7 +40,7 @@ TIPO_CONTRATO_BG  = {
     "ALUGUEL": "background:#dbeafe;color:#1e40af",
 }
 
-CARD_STYLE = "border-radius:20px;overflow:hidden;min-width:440px;max-width:480px;width:100%"
+CARD_STYLE = "border-radius:20px;overflow:hidden;width:100%;max-width:480px;"
 
 def tag(text: str, style: str):
     ui.label(text).style(
@@ -95,7 +108,7 @@ def build_imoveis():
                 ui.label("Nenhum imóvel cadastrado.").classes("text-gray-400 py-8 text-center w-full")
                 return
             for im in items:
-                with ui.card().style("flex:0 0 calc(33.333% - 11px);width:calc(33.333% - 11px);border-radius:16px;border:1px solid #f1f5f9;box-shadow:0 1px 4px rgba(0,0,0,.06)").classes("hover:shadow-md transition-shadow"):
+                with ui.card().style("border-radius:16px;border:1px solid var(--border-color);box-shadow:0 1px 4px rgba(0,0,0,.06)").classes("responsive-card hover-effect animate-fade-in"):
                     with ui.card_section():
                         with ui.row().classes("w-full justify-between items-center gap-4"):
                             with ui.column().classes("gap-1 flex-1 min-w-0"):
@@ -176,7 +189,7 @@ def build_imoveis():
         modal_actions(dlg_e, do_edit, "orange")
 
     # modal status
-    with ui.dialog().props("persistent") as dlg_s, ui.card().style("border-radius:20px;overflow:hidden;min-width:340px;max-width:380px;width:100%"):
+    with ui.dialog().props("persistent") as dlg_s, ui.card().style("border-radius:20px;overflow:hidden;max-width:380px;width:100%"):
         with ui.element("div").style("background:#334155;padding:16px 20px;border-radius:20px 20px 0 0"):
             ui.label("Alterar Status").style("color:white;font-size:17px;font-weight:700")
         with ui.column().style("padding:16px 20px;gap:12px;width:100%"):
@@ -196,7 +209,7 @@ def build_clientes():
                 ui.label("Nenhum cliente cadastrado.").classes("text-gray-400 py-8 text-center w-full")
                 return
             for cl in items:
-                with ui.card().style("flex:0 0 calc(33.333% - 11px);width:calc(33.333% - 11px);border-radius:16px;border:1px solid #f1f5f9;box-shadow:0 1px 4px rgba(0,0,0,.06)").classes("hover:shadow-md transition-shadow"):
+                with ui.card().style("border-radius:16px;border:1px solid var(--border-color);box-shadow:0 1px 4px rgba(0,0,0,.06)").classes("responsive-card hover-effect animate-fade-in"):
                     with ui.card_section():
                         with ui.row().classes("justify-between items-center w-full"):
                             with ui.column().classes("gap-0"):
@@ -242,7 +255,7 @@ def build_transacoes():
                 titulo_im  = imoveis_map.get(tr["imovel_id"],  f"Imóvel #{tr['imovel_id']}")
                 nome_prop  = clientes_map.get(tr["proprietario_id"], f"Cliente #{tr['proprietario_id']}")
                 nome_cli   = clientes_map.get(tr["cliente_id"],      f"Cliente #{tr['cliente_id']}")
-                with ui.card().style("flex:0 0 calc(33.333% - 11px);width:calc(33.333% - 11px);border-radius:16px;border:1px solid #f1f5f9;box-shadow:0 1px 4px rgba(0,0,0,.06)").classes("hover:shadow-md transition-shadow"):
+                with ui.card().style("border-radius:16px;border:1px solid var(--border-color);box-shadow:0 1px 4px rgba(0,0,0,.06)").classes("responsive-card hover-effect animate-fade-in"):
                     with ui.card_section():
                         with ui.row().classes("justify-between items-center w-full"):
                             with ui.column().classes("gap-1 flex-1"):
@@ -326,7 +339,7 @@ def build_financeiro():
                 return
             for p in items:
                 label_tr = transacoes_map.get(p["transacao_id"], f"Transação #{p['transacao_id']}")
-                with ui.card().style("flex:0 0 calc(33.333% - 11px);width:calc(33.333% - 11px);border-radius:16px;border:1px solid #f1f5f9;box-shadow:0 1px 4px rgba(0,0,0,.06)").classes("hover:shadow-md transition-shadow"):
+                with ui.card().style("border-radius:16px;border:1px solid var(--border-color);box-shadow:0 1px 4px rgba(0,0,0,.06)").classes("responsive-card hover-effect animate-fade-in"):
                     with ui.card_section():
                         with ui.row().classes("justify-between items-center w-full"):
                             with ui.column().classes("gap-1 flex-1"):
@@ -379,7 +392,7 @@ def build_financeiro():
             f_tipo      = ui.select(["SINAL","COMISSAO","ALUGUEL","REAJUSTE","OUTRO"], label="Tipo", value="ALUGUEL").props("outlined dense").classes("w-full")
         modal_actions(dlg_c, do_create, "positive")
 
-    with ui.dialog().props("persistent") as dlg_baixa, ui.card().style("border-radius:20px;overflow:hidden;min-width:360px;max-width:400px;width:100%"):
+    with ui.dialog().props("persistent") as dlg_baixa, ui.card().style("border-radius:20px;overflow:hidden;max-width:400px;width:100%"):
         with ui.element("div").style("background:#16a34a;padding:16px 20px;border-radius:20px 20px 0 0"):
             ui.label("Registrar Pagamento").style("color:white;font-size:17px;font-weight:700")
         with ui.column().style("padding:16px 20px;gap:12px;width:100%"):
@@ -403,7 +416,7 @@ def build_corretores():
             for cr in items:
                 status_color = "background:#dcfce7;color:#166534" if cr.get("ativo") else "background:#fee2e2;color:#991b1b"
                 status_text = "ATIVO" if cr.get("ativo") else "INATIVO"
-                with ui.card().style("flex:0 0 calc(33.333% - 11px);width:calc(33.333% - 11px);border-radius:16px;border:1px solid #f1f5f9;box-shadow:0 1px 4px rgba(0,0,0,.06)").classes("hover:shadow-md transition-shadow"):
+                with ui.card().style("border-radius:16px;border:1px solid var(--border-color);box-shadow:0 1px 4px rgba(0,0,0,.06)").classes("responsive-card hover-effect animate-fade-in"):
                     with ui.card_section():
                         with ui.row().classes("justify-between items-center w-full"):
                             with ui.column().classes("gap-0"):
@@ -451,7 +464,7 @@ def build_leads():
                 return
             for ld in items:
                 corretor_nome = corretores_map.get(ld["corretor_id"], f"Corretor #{ld['corretor_id']}")
-                with ui.card().style("flex:0 0 calc(33.333% - 11px);width:calc(33.333% - 11px);border-radius:16px;border:1px solid #f1f5f9;box-shadow:0 1px 4px rgba(0,0,0,.06)").classes("hover:shadow-md transition-shadow"):
+                with ui.card().style("border-radius:16px;border:1px solid var(--border-color);box-shadow:0 1px 4px rgba(0,0,0,.06)").classes("responsive-card hover-effect animate-fade-in"):
                     with ui.card_section():
                         with ui.row().classes("justify-between items-start w-full"):
                             with ui.column().classes("gap-0"):
@@ -473,7 +486,7 @@ def build_leads():
         if len(f_telefone.value or "") < 8: ui.notify("Telefone: mín. 8 caracteres", type="warning"); return
         if not f_corretor.value: ui.notify("Selecione um corretor", type="warning"); return
         
-        dados = {"nome": f_nome.value, "telefone": f_telefone.value, "interesse": f_interesse.value, "corretor_id": int(f_corretor.value)}
+        dados = {"nome": str(f_nome.value), "telefone": str(f_telefone.value), "interesse": str(f_interesse.value or ""), "corretor_id": int(f_corretor.value)}
         r = await api_post("/leads/", dados)
         if ok(r, "Lead registrado!"): dlg_c.close(); await refresh()
 
@@ -528,7 +541,7 @@ def build_visitas():
                     "CANCELADA": "background:#fee2e2;color:#991b1b"
                 }.get(v["status"], "background:#f3f4f6;color:#6b7280")
                 
-                with ui.card().style("flex:0 0 calc(33.333% - 11px);width:calc(33.333% - 11px);border-radius:16px;border:1px solid #f1f5f9;box-shadow:0 1px 4px rgba(0,0,0,.06)").classes("hover:shadow-md transition-shadow"):
+                with ui.card().style("border-radius:16px;border:1px solid var(--border-color);box-shadow:0 1px 4px rgba(0,0,0,.06)").classes("responsive-card hover-effect animate-fade-in"):
                     with ui.card_section():
                         with ui.row().classes("justify-between items-start w-full"):
                             with ui.column().classes("gap-1"):
@@ -587,14 +600,25 @@ def build_visitas():
 
 ui.add_head_html('''
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="/static/theme.css" rel="stylesheet">
 <style>
-  * { font-family: "Inter", sans-serif !important; }
-  body, .nicegui-content { background: #f1f5f9 !important; }
-  .q-tab--active .q-tab__label { font-weight: 700; }
-  .q-tab__indicator { height: 3px; border-radius: 3px; }
+  /* Animações e Efeitos Globais */
+  @keyframes slideUp {
+      from { opacity: 0; transform: translateY(15px); }
+      to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fade-in { animation: slideUp 0.4s ease-out forwards; }
+  .hover-effect { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+  .hover-effect:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.08); }
+  
+  /* Estilos Globais amarrados ao theme.css */
+  * { font-family: var(--font-primary, "Inter", sans-serif) !important; }
+  body, .nicegui-content { background: var(--bg-light, #f1f5f9) !important; }
+  .q-tab--active .q-tab__label { font-weight: 700; color: var(--primary-dark, #5a67d8); }
+  .q-tab__indicator { height: 3px; border-radius: 3px; background-color: var(--primary-color, #667eea) !important; }
   .q-icon { display: none !important; }
-  .q-dialog__inner { align-items: center !important; justify-content: center !important; }
-  .q-dialog__inner > div { margin: auto !important; }
+  .q-dialog__inner { align-items: center !important; justify-content: center !important; padding: 16px !important; }
+  .q-dialog__inner > div { margin: auto !important; max-width: 100%; }
 </style>
 ''', shared=True)
 
@@ -645,11 +669,11 @@ def catalogo_page():
             if combo_imovel.value and combo_imovel.value != "Todos":
                 params["tipo_imovel"] = combo_imovel.value
             
-            if slider_valor.value and slider_valor.value[0] > 0:
-                params["valor_min"] = slider_valor.value[0]
+            if slider_valor.value and slider_valor.value['min'] > 0:
+                params["valor_min"] = slider_valor.value['min']
             
-            if slider_valor.value and slider_valor.value[1] < 1000000:
-                params["valor_max"] = slider_valor.value[1]
+            if slider_valor.value and slider_valor.value['max'] < 1000000:
+                params["valor_max"] = slider_valor.value['max']
             
             # Faz requisição
             async with httpx.AsyncClient() as c:
@@ -675,10 +699,8 @@ def catalogo_page():
         with cards_container:
             for imovel in imoveis_lista:
                 with ui.card().style(
-                    "flex:0 0 calc(33.333% - 12px);width:calc(33.333% - 12px);"
-                    "border-radius:16px;border:1px solid #e2e8f0;box-shadow:0 1px 3px rgba(0,0,0,.1);"
-                    "transition:all .3s;cursor:pointer"
-                ).classes("hover:shadow-xl hover:-translate-y-1").props("flat"):
+                    f"border-radius:16px;border:1px solid var(--border-color);box-shadow:0 1px 3px rgba(0,0,0,.08);cursor:pointer"
+                ).classes("catalogo-card hover-effect animate-fade-in").props("flat"):
                     
                     # Foto
                     with ui.image(source=imovel.get("foto_url") or "/api/v1/static/placeholder.png").style(
@@ -689,13 +711,13 @@ def catalogo_page():
                     # Conteúdo
                     with ui.card_section():
                         # Título e localização
-                        ui.label(imovel["titulo"]).classes("font-bold text-lg text-gray-900")
-                        ui.label(imovel.get("bairro", "Bairro não informado")).classes("text-sm text-gray-500 mb-3")
+                        ui.label(imovel["titulo"]).classes(f"font-bold text-lg")
+                        ui.label(imovel.get("bairro", "Bairro não informado")).classes(f"text-sm text-gray-500 mb-3")
                         
                         # Tags
                         with ui.row().classes("gap-2 items-center flex-wrap mb-3"):
                             if imovel.get("tipo_transacao"):
-                                tipo_color = "bg-purple-100 text-purple-800" if imovel["tipo_transacao"] == "VENDA" else "bg-blue-100 text-blue-800"
+                                tipo_color = "bg-indigo-100 text-indigo-800" if imovel["tipo_transacao"] == "VENDA" else "bg-blue-100 text-blue-800"
                                 ui.label(imovel["tipo_transacao"]).classes(f"px-3 py-1 rounded-full text-xs font-semibold {tipo_color}")
                             
                             if imovel.get("tipo_imovel"):
@@ -703,14 +725,14 @@ def catalogo_page():
                         
                         # Preço
                         ui.label(f"R$ {float(imovel['preco_atual']):,.2f}").style(
-                            "color:#059669;font-weight:700;font-size:18px"
+                            f"color:{PRIMARY_COLOR};font-weight:700;font-size:18px"
                         )
                         
                         # Descrição resumida
                         desc = imovel.get("descricao", "Sem descrição")
                         if len(desc) > 100:
                             desc = desc[:100] + "..."
-                        ui.label(desc).classes("text-sm text-gray-600 mt-2")
+                        ui.label(desc).classes(f"text-sm {TEXT_SECONDARY} mt-2")
                     
                     # Botão
                     with ui.card_section():
@@ -719,7 +741,7 @@ def catalogo_page():
                         
                         ui.button("Ver Detalhes", on_click=ver_detalhes).props(
                             "color=primary unelevated rounded"
-                        ).classes("w-full")
+                        ).classes("w-full").style(f"background:{PRIMARY_COLOR}")
     
     async def abrir_modal_detalhes(imovel_id: int):
         """Abre modal com detalhes do imóvel."""
@@ -732,26 +754,26 @@ def catalogo_page():
                 
                 # Modal de detalhes
                 with ui.dialog() as dlg_detalhes:
-                    with ui.card().style("max-width:600px;border-radius:20px;overflow:hidden"):
+                    with ui.card().style(f"max-width:600px;width:100%;border-radius:20px;overflow:hidden;border:1px solid var(--border-color);box-shadow:0 10px 40px rgba(0,0,0,.1)"):
                         # Foto grande
                         if im.get("foto_url"):
                             ui.image(source=im["foto_url"]).style("width:100%;height:300px;object-fit:cover")
                         
                         # Detalhes
                         with ui.card_section():
-                            ui.label(im["titulo"]).classes("font-bold text-xl text-gray-900")
-                            ui.label(im["endereco"]).classes("text-sm text-gray-600")
+                            ui.label(im["titulo"]).classes("font-bold text-xl")
+                            ui.label(im["endereco"]).classes(f"text-sm {TEXT_SECONDARY}")
                             
                             with ui.row().classes("gap-2 my-3 flex-wrap"):
                                 if im.get("bairro"):
-                                    ui.label(f"Bairro: {im['bairro']}").classes("px-3 py-1 rounded text-sm bg-blue-50 text-blue-800")
+                                    ui.label(f"Bairro: {im['bairro']}").classes(f"px-3 py-1 rounded text-sm bg-indigo-50 {TEXT_PRIMARY}")
                                 if im.get("tipo_transacao"):
-                                    ui.label(im["tipo_transacao"]).classes("px-3 py-1 rounded text-sm bg-purple-50 text-purple-800")
+                                    ui.label(im["tipo_transacao"]).classes("px-3 py-1 rounded text-sm bg-blue-50 text-blue-800")
                                 if im.get("tipo_imovel"):
                                     ui.label(im["tipo_imovel"]).classes("px-3 py-1 rounded text-sm bg-gray-100 text-gray-800")
                             
                             ui.label(f"R$ {float(im['preco_atual']):,.2f}").style(
-                                "color:#059669;font-weight:700;font-size:22px;display:block;margin:12px 0"
+                                f"color:{PRIMARY_COLOR};font-weight:700;font-size:22px;display:block;margin:12px 0"
                             )
                             
                             ui.label("Descrição:").classes("font-semibold text-gray-800 mt-4")
@@ -794,7 +816,7 @@ def catalogo_page():
                             
                             ui.button("Enviar Interesse", on_click=enviar_interesse).props(
                                 "color=primary unelevated rounded"
-                            ).classes("w-full mt-4")
+                            ).classes("w-full mt-4").style(f"background:{PRIMARY_COLOR}")
                         
                         # Fechar
                         with ui.card_section():
@@ -806,48 +828,51 @@ def catalogo_page():
     
     # ── Layout da Página ──
     
-    with ui.header().style("background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);padding:0;box-shadow:0 4px 20px rgba(0,0,0,.2)"):
-        with ui.row().classes("items-center justify-between w-full px-8").style("height:70px"):
+    with ui.header().style(f"background:linear-gradient(135deg, {PRIMARY_COLOR} 0%, {PRIMARY_DARK} 100%);padding:0;box-shadow:0 2px 12px rgba(0,0,0,.1)"):
+        with ui.row().classes("items-center justify-between w-full px-6").style("height:70px;max-width:100%;margin:0 auto"):
             with ui.column().classes("gap-0 leading-none"):
-                ui.label("🏠 Catálogo de Imóveis").style("color:white;font-weight:700;font-size:18px")
+                ui.label("🏠 Catálogo de Imóveis").style("color:white;font-weight:700;font-size:20px")
                 ui.label("Encontre seu imóvel ideal").style("color:#e0e7ff;font-size:12px")
             ui.button("Entrar", on_click=lambda: ui.navigate.to("/login")).props("color=white flat").classes("px-6")
     
-    with ui.column().classes("w-full max-w-7xl mx-auto px-6 py-8 gap-6"):
-        # Filtros
-        with ui.card().classes("w-full rounded-lg shadow-sm"):
-            with ui.column().classes("gap-4"):
-                ui.label("Filtrar Imóveis").classes("font-bold text-lg text-gray-800 mb-2")
-                
-                with ui.row().classes("gap-4 flex-wrap w-full"):
-                    combo_bairro = ui.select([], label="Bairro").props("outlined dense clearable").classes("flex-1 min-w-48")
-                    combo_tipo = ui.select(["Ambos"] + tipos_transacao, value="Ambos", label="Tipo").props("outlined dense").classes("flex-1 min-w-48")
-                    combo_imovel = ui.select(["Todos"] + tipos_imovel_lista, value="Todos", label="Tipo de Imóvel").props("outlined dense").classes("flex-1 min-w-48")
-                
-                with ui.row().classes("gap-4 w-full items-end"):
-                    ui.label("Faixa de Preço:").classes("font-semibold text-gray-700")
-                    slider_valor = ui.slider(min=0, max=1000000, value=(0, 1000000)).props("range").classes("flex-1")
-                    label_valor = ui.label("").classes("min-w-40 text-right")
+    with ui.column().classes("w-full gap-6").style(f"background:{BG_LIGHT};padding:32px 24px;min-height:calc(100vh - 70px)"):
+        # Container centralizado
+        with ui.column().classes("w-full gap-6").style("max-width:1200px;margin:0 auto"):
+            # Filtros
+            with ui.card().classes("w-full rounded-lg shadow-sm").style(f"border:1px solid {BORDER_COLOR}"):
+                with ui.column().classes("gap-4").style("padding:24px"):
+                    ui.label("Filtrar Imóveis").classes("font-bold text-lg")
                     
-                    def atualizar_label():
-                        label_valor.set_text(f"R$ {slider_valor.value[0]:,.0f} - R$ {slider_valor.value[1]:,.0f}")
+                    with ui.row().classes("gap-4 flex-wrap w-full"):
+                        combo_bairro = ui.select([], label="Bairro").props("outlined dense clearable").classes("flex-1 min-w-48")
+                        combo_tipo = ui.select(["Ambos"] + tipos_transacao, value="Ambos", label="Tipo").props("outlined dense").classes("flex-1 min-w-48")
+                        combo_imovel = ui.select(["Todos"] + tipos_imovel_lista, value="Todos", label="Tipo de Imóvel").props("outlined dense").classes("flex-1 min-w-48")
                     
-                    slider_valor.on_value_change(lambda: atualizar_label())
-                    atualizar_label()
-                
-                with ui.row().classes("gap-2 justify-end w-full"):
-                    ui.button("Buscar", on_click=filtrar_imoveis).props("color=primary unelevated rounded").classes("px-8")
-                    ui.button("Limpar Filtros", on_click=lambda: combo_bairro.set_value("Todos") or combo_tipo.set_value("Ambos") or combo_imovel.set_value("Todos")).props("flat").classes("px-6")
-        
-        # Cards de imóveis
-        cards_container = ui.element("div").style("display:flex;flex-wrap:wrap;gap:16px;width:100%")
-        
-        # Carrega dados iniciais
-        async def init():
-            await carregar_bairros()
-            await filtrar_imoveis()
-        
-        ui.timer(0.1, init, once=True)
+                    with ui.row().classes("gap-4 w-full items-end"):
+                        ui.label("Faixa de Preço:").classes("font-semibold")
+                        slider_valor = ui.range(min=0, max=1000000, value={'min': 0, 'max': 1000000}).classes("flex-1")
+                        label_valor = ui.label("").classes("min-w-40 text-right")
+                        
+                        def atualizar_label():
+                            val = slider_valor.value
+                            label_valor.set_text(f"R$ {val['min']:,.0f} - R$ {val['max']:,.0f}")
+                        
+                        slider_valor.on_value_change(lambda: atualizar_label())
+                        atualizar_label()
+                    
+                    with ui.row().classes("gap-2 justify-end w-full"):
+                        ui.button("Buscar", on_click=filtrar_imoveis).props("unelevated rounded").classes("px-8").style(f"background:{PRIMARY_COLOR};color:white;font-weight:600")
+                        ui.button("Limpar Filtros", on_click=lambda: combo_bairro.set_value("Todos") or combo_tipo.set_value("Ambos") or combo_imovel.set_value("Todos")).props("flat").classes("px-6")
+            
+            # Cards de imóveis
+            cards_container = ui.element("div").style("display:flex;flex-wrap:wrap;gap:16px;width:100%")
+            
+            # Carrega dados iniciais
+            async def init():
+                await carregar_bairros()
+                await filtrar_imoveis()
+            
+            ui.timer(0.1, init, once=True)
 
 # ── TELA DE LOGIN ─────────────────────────────────────────────────────────────
 
@@ -870,16 +895,19 @@ def login_page():
         except Exception as e:
             ui.notify(f"Falha de conexão: {e}", type="negative")
 
-    with ui.column().style("min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0f172a"):
-        with ui.card().style("width:380px;border-radius:24px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)"):
-            with ui.element("div").style("background:#1e293b;padding:32px 32px 24px;text-align:center"):
-                ui.label("ERP Imobiliária").style("color:white;font-size:22px;font-weight:700;display:block")
-                ui.label("Sistema de Gestão").style("color:#94a3b8;font-size:13px;display:block;margin-top:4px")
-            with ui.column().style("padding:24px 32px 32px;gap:16px;background:white"):
-                u_input = ui.input("Usuário").props("outlined dense").classes("w-full")
+    with ui.column().classes("w-full absolute inset-0 justify-center items-center").style(f"background:{BG_LIGHT};padding:24px"):
+        with ui.card().style(f"width:100%;max-width:333px;border-radius:24px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.08);border:1px solid {BORDER_COLOR}"):
+            with ui.element("div").style(f"width:100% ;background:linear-gradient(135deg, {PRIMARY_COLOR} 0%, {PRIMARY_DARK} 100%);padding:40px 32px 32px;text-align:center"):
+                ui.label("🏠 ERP Imobiliária").style("color:white;font-size:24px;font-weight:700;display:block")
+                ui.label("Sistema de Gestão de Imóveis").style("color:#e0e7ff;font-size:13px;display:block;margin-top:8px")
+            with ui.column().style(f"padding:32px;gap:16px;background:white"):
+                u_input = ui.input("Usuário ou E-mail").props("outlined dense").classes("w-full")
+                u_input.props("placeholder=Digite seu usuário")
                 p_input = ui.input("Senha", password=True, password_toggle_button=False).props("outlined dense type=password").classes("w-full")
-                ui.button("Entrar", on_click=do_login).props("color=primary unelevated rounded").classes("w-full").style("height:44px;font-size:15px;font-weight:600")
-                ui.label("Acesso restrito ao sistema").style("color:#94a3b8;font-size:11px;text-align:center")
+                p_input.props("placeholder=Digite sua senha")
+                ui.button("Entrar", on_click=do_login).props("color=primary unelevated rounded").classes("w-full").style(f"height:48px;font-size:15px;font-weight:600;background:{PRIMARY_COLOR}")
+                ui.label("Acesso restrito ao sistema").style(f"color:{TEXT_SECONDARY};font-size:12px;text-align:center")
+
 
 # ── TELA PRINCIPAL ────────────────────────────────────────────────────────────
 
