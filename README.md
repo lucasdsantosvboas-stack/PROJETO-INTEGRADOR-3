@@ -269,7 +269,69 @@ projeto/
 
 ---
 
-## 📝 Próximos Passos (Futuro)
+## 📊 Arquitetura do Banco de Dados (Diagrama UML)
+
+O diagrama abaixo ilustra o modelo de domínio relacional da aplicação. No GitHub ou em visualizadores Markdown compatíveis, ele é renderizado automaticamente como imagem.
+
+```mermaid
+classDiagram
+    class Imovel {
+        +int id
+        +string titulo
+        +float preco_atual
+        +StatusImovel status
+        +string endereco
+        +TipoImovel tipo_imovel
+        +TipoTransacao tipo_transacao
+    }
+    class Cliente {
+        +int id
+        +string nome
+        +TipoCliente tipo
+        +string cpf
+        +bool cpf_valido
+    }
+    class Transacao {
+        +int id
+        +TipoTransacao tipo_contrato
+        +float valor_total_contrato
+        +float comissao_percentual
+        +float sinal_negocio
+    }
+    class PagamentoParcela {
+        +int id
+        +float valor_parcela
+        +date data_vencimento
+        +StatusPagamento status_pagamento
+    }
+    class Corretor {
+        +int id
+        +string nome
+        +string email
+        +string registro_profissional
+    }
+    class Lead {
+        +int id
+        +string nome
+        +string telefone
+        +StatusLead status
+    }
+    class Visita {
+        +int id
+        +datetime data_visita
+        +StatusVisita status
+    }
+
+    Cliente "1" <-- "0..*" Transacao : proprietario/cliente
+    Imovel "1" <-- "0..*" Transacao : imovel
+    Transacao "1" *-- "1..*" PagamentoParcela : gera parcelas
+    Corretor "1" <-- "0..*" Lead : atende
+    Lead "1" <-- "0..*" Visita : interessado
+    Imovel "1" <-- "0..*" Visita : recebe
+    Corretor "1" <-- "0..*" Visita : conduz
+```
+
+## � Próximos Passos (Futuro)
 
 1. **Múltiplas fotos por imóvel**: Criar tabela `ImovelFoto` (1:N)
 2. **Galeria de fotos**: Implementar carousel no modal de detalhes
