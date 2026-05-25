@@ -3,6 +3,7 @@ from nicegui import ui
 from nicegui import ui, app
 import httpx
 from datetime import date
+import uuid
 
 BASE = "http://localhost:8000/api/v1"
 
@@ -62,28 +63,41 @@ def dlg(title: str, color: str):
 
 async def api_get(path):
     try:
-        async with httpx.AsyncClient() as c:
-            r = await c.get(f"{BASE}{path}")
+        async with httpx.AsyncClient(follow_redirects=True) as c:
+            r = await c.get(f"{BASE}{path}", headers=get_headers())
+        if r.status_code != 200:
+            print(f"⚠️ FALHA AO CARREGAR DADOS ({path}): Status {r.status_code} - {r.text}")
         return r.json() if r.status_code == 200 else []
     except Exception as e:
+        print(f"❌ ERRO DE CONEXÃO AO CARREGAR ({path}): {e}")
         ui.notify(f"Falha de conexão: {e}", type="negative"); return []
 
 async def api_post(path, data):
-    async with httpx.AsyncClient() as c:
-        return await c.post(f"{BASE}{path}", json=data)
+    async with httpx.AsyncClient(follow_redirects=True) as c:
+        return await c.post(f"{BASE}{path}", json=data, headers=get_headers())
 
 async def api_put(path, data):
-    async with httpx.AsyncClient() as c:
-        return await c.put(f"{BASE}{path}", json=data)
+    async with httpx.AsyncClient(follow_redirects=True) as c:
+        return await c.put(f"{BASE}{path}", json=data, headers=get_headers())
 
 async def api_patch(path, data):
-    async with httpx.AsyncClient() as c:
-        return await c.patch(f"{BASE}{path}", json=data)
+    async with httpx.AsyncClient(follow_redirects=True) as c:
+        return await c.patch(f"{BASE}{path}", json=data, headers=get_headers())
+
+async def api_delete(path):
+    async with httpx.AsyncClient(follow_redirects=True) as c:
+        return await c.delete(f"{BASE}{path}", headers=get_headers())
 
 def ok(r, msg):
-    if r.status_code in (200, 201):
+    if r.status_code in (200, 201, 204):
         ui.notify(msg, type="positive", position="top-right", timeout=2500); return True
-    ui.notify(f"Erro: {r.json().get('detail','Erro desconhecido')}", type="negative", position="top-right"); return False
+    try:
+        erro = r.json().get('detail','Erro desconhecido') if r.text else "Resposta vazia do servidor"
+    except:
+        erro = f"Erro {r.status_code}: {r.text[:100] if r.text else 'Resposta vazia'}"
+    print(f"❌ ERRO DA API ({r.status_code}): {erro}")
+    ui.notify(f"Erro: {erro}", type="negative", position="top-right")
+    return False
 
 def section_header(label, btn_label, btn_color, btn_action):
     with ui.row().classes("justify-between items-center w-full mb-5"):
@@ -98,7 +112,7 @@ def modal_actions(dlg_ref, save_fn, btn_color):
 # ── IMÓVEIS ───────────────────────────────────────────────────────────────────
 
 def build_imoveis():
-    h = {"id": None}
+    h = {"id": None, "fotos": []}  # Adiciona lista de fotos
 
     async def refresh():
         lista.clear()
@@ -122,19 +136,126 @@ def build_imoveis():
                             with ui.row().classes("gap-2 shrink-0"):
                                 ui.button("Editar", on_click=lambda _, i=im: open_edit(i)).props("flat dense color=primary size=sm")
                                 ui.button("Status", on_click=lambda _, i=im: open_status(i)).props("flat dense color=orange size=sm")
+                                
+                                async def deletar_imovel(i=im):
+                                    r = await api_delete(f"/imoveis/{i['id']}")
+                                    if ok(r, "Imóvel excluído!"):
+                                        await refresh()
+                                        
+                                ui.button("Deletar", on_click=lambda _, i=im: deletar_imovel(i)).props("flat dense color=negative size=sm")
+
+    async def upload_foto_create(e):
+        """Faz o envio imediato da foto do modal de criação para o servidor"""
+        try:
+            # Extrai o conteúdo do arquivo de forma segura
+            content = getattr(e, 'content', None)
+            if not content: return
+            
+            file_bytes = content.read()
+            files = {'file': (e.name, file_bytes, getattr(e, 'type', 'image/jpeg'))}
+            
+            async with httpx.AsyncClient() as c:
+                r = await c.post(f"{BASE}/imoveis/upload-foto", files=files)
+                
+            if r.status_code in (200, 201):
+                data = r.json()
+                h["fotos"].append({"path": data["foto_url"], "name": e.name})
+                ui.notify(f"Foto '{e.name}' enviada com sucesso!", type="positive")
+                await refresh_galeria_create()
+            else:
+                ui.notify(f"Erro no servidor ao enviar foto: {r.status_code}", type="negative")
+        except Exception as ex:
+            ui.notify(f"Erro: {str(ex)}", type="negative")
+
+    async def upload_foto_edit(e):
+        """Envia e já vincula a nova foto ao imóvel existente"""
+        try:
+            content = getattr(e, 'content', None)
+            if not content: return
+            
+            file_bytes = content.read()
+            files = {'file': (e.name, file_bytes, getattr(e, 'type', 'image/jpeg'))}
+            
+            async with httpx.AsyncClient() as c:
+                r = await c.post(f"{BASE}/imoveis/upload-foto", files=files)
+                
+            if r.status_code in (200, 201):
+                data = r.json()
+                foto_payload = {"foto_url": data["foto_url"], "ordem": len(h.get("fotos_banco") or [])}
+                r2 = await api_post(f"/imoveis/{h['id']}/fotos/link", foto_payload)
+                if r2.status_code in (200, 201):
+                    h["fotos_banco"].append(r2.json())
+                    ui.notify(f"Foto '{e.name}' adicionada ao imóvel!", type="positive")
+                    await refresh_galeria_edit()
+            else:
+                ui.notify(f"Erro no servidor ao enviar foto: {r.status_code}", type="negative")
+        except Exception as ex:
+            ui.notify(f"Erro: {str(ex)}", type="negative")
+
+    async def refresh_galeria_create():
+        """Atualiza galeria no modal de criação"""
+        galeria_create.clear()
+        with galeria_create:
+            if not h["fotos"]:
+                ui.label("Nenhuma imagem adicionada").classes("text-gray-400 text-center py-4 w-full")
+                return
+            with ui.row().classes("gap-2 w-full flex-wrap"):
+                for i, foto in enumerate(h["fotos"]):
+                    with ui.card().classes("w-24 h-24 p-0 rounded overflow-hidden"):
+                        ui.image(f"/static/{foto['path']}").classes("w-full h-full object-cover")
+                        with ui.row().classes("absolute bottom-0 left-0 right-0 bg-black/50 gap-1 p-1").style("position:absolute"):
+                            ui.button("X", on_click=lambda _, idx=i: (h["fotos"].pop(idx), refresh_galeria_create())).props("flat dense size=xs color=negative")
+
+    async def refresh_galeria_edit():
+        """Atualiza galeria no modal de edição"""
+        galeria_edit.clear()
+        with galeria_edit:
+            if not h.get("fotos_banco"):
+                ui.label("Nenhuma imagem").classes("text-gray-400 text-center py-4 w-full")
+                return
+            with ui.row().classes("gap-2 w-full flex-wrap"):
+                for foto in (h.get("fotos_banco") or []):
+                    with ui.card().classes("w-24 h-24 p-0 rounded overflow-hidden relative"):
+                        ui.image(f"/static/{foto['foto_url']}").classes("w-full h-full object-cover")
+                        with ui.row().classes("absolute bottom-0 left-0 right-0 bg-black/50 gap-1 p-1").style("position:absolute"):
+                            async def _delete_foto(foto_id=foto["id"]):
+                                r = await api_delete(f"/imoveis/{h['id']}/fotos/{foto_id}")
+                                if r.status_code == 204:
+                                    h["fotos_banco"].remove(foto)
+                                    await refresh_galeria_edit()
+                                    ui.notify("Foto deletada!", type="positive")
+                            ui.button("X", on_click=_delete_foto).props("flat dense size=xs color=negative")
 
     def open_create():
-        for f in [f_titulo, f_descricao, f_endereco]: f.value = ""
+        h["fotos"] = []  # Reset de fotos temporárias
+        f_titulo.value = ""
+        f_descricao.value = ""
         f_preco.value = None
+        f_cep.value = ""
+        f_endereco.value = ""
+        f_numero.value = ""
+        f_bairro.value = ""
+        f_cidade.value = ""
+        f_tipo_imovel.value = "APARTAMENTO"
+        f_tipo_transacao.value = "VENDA"
+        ui.timer(0.1, refresh_galeria_create, once=True)
         dlg_c.open()
 
     def open_edit(im):
         h["id"] = im["id"]
+        h["fotos_banco"] = im.get("fotos") or []
         e_titulo.value    = im["titulo"]
         e_descricao.value = im.get("descricao") or ""
         e_preco.value     = float(im["preco_atual"])
         e_endereco.value  = im["endereco"]
+        e_numero.value    = ""
+        e_cep.value       = ""
+        e_bairro.value    = im.get("bairro") or ""
+        e_cidade.value    = ""
         e_status.value    = im["status"]
+        e_tipo_imovel.value = im.get("tipo_imovel") or "APARTAMENTO"
+        e_tipo_transacao.value = im.get("tipo_transacao") or "VENDA"
+        ui.timer(0.1, refresh_galeria_edit, once=True)
         dlg_e.open()
 
     def open_status(im):
@@ -142,20 +263,106 @@ def build_imoveis():
         s_status.value = im["status"]
         dlg_s.open()
 
+    async def buscar_cep_create():
+        cep_str = f_cep.value
+        if not cep_str: return
+        cep_limpo = "".join(filter(str.isdigit, cep_str))
+        if len(cep_limpo) != 8:
+            ui.notify("CEP inválido", type="warning")
+            return
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(f"https://brasilapi.com.br/api/cep/v1/{cep_limpo}")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    f_endereco.value = data.get("street", "")
+                    f_bairro.value = data.get("neighborhood", "")
+                    f_cidade.value = data.get("city", "")
+                else:
+                    ui.notify("CEP não encontrado", type="warning")
+        except Exception:
+            ui.notify("Erro ao buscar CEP", type="warning")
+
+    async def buscar_cep_edit():
+        cep_str = e_cep.value
+        if not cep_str: return
+        cep_limpo = "".join(filter(str.isdigit, cep_str))
+        if len(cep_limpo) != 8:
+            ui.notify("CEP inválido", type="warning")
+            return
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(f"https://brasilapi.com.br/api/cep/v1/{cep_limpo}")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    e_endereco.value = data.get("street", "")
+                    e_bairro.value = data.get("neighborhood", "")
+                    e_cidade.value = data.get("city", "")
+                else:
+                    ui.notify("CEP não encontrado", type="warning")
+        except Exception:
+            ui.notify("Erro ao buscar CEP", type="warning")
+
     async def do_create():
         if len(f_titulo.value or "") < 5: ui.notify("Título: mín. 5 caracteres", type="warning"); return
         if not f_preco.value or f_preco.value <= 0: ui.notify("Preço deve ser > 0", type="warning"); return
-        if len(f_endereco.value or "") < 10: ui.notify("Endereço: mín. 10 caracteres", type="warning"); return
-        r = await api_post("/imoveis/", {"titulo": f_titulo.value, "descricao": f_descricao.value,
-                                          "preco_atual": f_preco.value, "endereco": f_endereco.value, "status": "DISPONIVEL"})
-        if ok(r, "Imóvel criado!"): dlg_c.close(); await refresh()
+        
+        end_parts = [f_endereco.value or ""]
+        if f_numero.value: end_parts.append(f"nº {f_numero.value}")
+        if f_cidade.value: end_parts.append(f_cidade.value)
+        if f_cep.value: end_parts.append(f"CEP: {f_cep.value}")
+        
+        endereco_completo = ", ".join([p for p in end_parts if p.strip()])
+        if len(endereco_completo) < 10: ui.notify("Endereço muito curto", type="warning"); return
+        
+        dados = {
+            "titulo": f_titulo.value,
+            "descricao": f_descricao.value,
+            "preco_atual": f_preco.value,
+            "endereco": endereco_completo,
+            "bairro": f_bairro.value,
+            "tipo_imovel": f_tipo_imovel.value,
+            "tipo_transacao": f_tipo_transacao.value,
+            "status": "DISPONIVEL",
+            # Se o corretor anexou imagens, usa a primeira como capa no banco de dados principal
+            "foto_url": h["fotos"][0]["path"] if h["fotos"] else None 
+        }
+        r = await api_post("/imoveis/", dados)
+        if not ok(r, "Imóvel criado!"): return
+        
+        novo_imovel = r.json()
+        imovel_id = novo_imovel["id"]
+        
+        # Associa todas as fotos enviadas à galeria do novo imóvel
+        for idx, foto in enumerate(h["fotos"]):
+            foto_payload = {"foto_url": foto["path"], "ordem": idx}
+            await api_post(f"/imoveis/{imovel_id}/fotos/link", foto_payload)
+        
+        dlg_c.close()
+        await refresh()
 
     async def do_edit():
         if len(e_titulo.value or "") < 5: ui.notify("Título: mín. 5 caracteres", type="warning"); return
         if not e_preco.value or e_preco.value <= 0: ui.notify("Preço deve ser > 0", type="warning"); return
-        if len(e_endereco.value or "") < 10: ui.notify("Endereço: mín. 10 caracteres", type="warning"); return
-        r = await api_put(f"/imoveis/{h['id']}", {"titulo": e_titulo.value, "descricao": e_descricao.value,
-                                                    "preco_atual": e_preco.value, "endereco": e_endereco.value, "status": e_status.value})
+        
+        end_parts = [e_endereco.value or ""]
+        if e_numero.value: end_parts.append(f"nº {e_numero.value}")
+        if e_cidade.value: end_parts.append(e_cidade.value)
+        if e_cep.value: end_parts.append(f"CEP: {e_cep.value}")
+        
+        endereco_completo = ", ".join([p for p in end_parts if p.strip()])
+        
+        dados = {
+            "titulo": e_titulo.value,
+            "descricao": e_descricao.value,
+            "preco_atual": e_preco.value,
+            "endereco": endereco_completo,
+            "bairro": e_bairro.value,
+            "tipo_imovel": e_tipo_imovel.value,
+            "tipo_transacao": e_tipo_transacao.value,
+            "status": e_status.value
+        }
+        r = await api_put(f"/imoveis/{h['id']}", dados)
         if ok(r, "Imóvel atualizado!"): dlg_e.close(); await refresh()
 
     async def do_status():
@@ -166,27 +373,81 @@ def build_imoveis():
     lista = ui.element("div").style("display:flex;flex-wrap:wrap;gap:16px;width:100%")
 
     # modal criar
-    with ui.dialog().props("persistent") as dlg_c, ui.card().style(CARD_STYLE):
-        with ui.element("div").style("background:#2563eb;padding:16px 20px;border-radius:20px 20px 0 0"):
+    with ui.dialog().props("persistent") as dlg_c, ui.card().style(CARD_STYLE).style("max-width: 600px; display: flex; flex-direction: column; max-height: 90vh;"):
+        with ui.element("div").style("background:#2563eb;padding:16px 20px;border-radius:20px 20px 0 0;flex-shrink:0"):
             ui.label("Novo Imóvel").style("color:white;font-size:17px;font-weight:700")
-        with ui.column().style("padding:16px 20px;gap:12px;width:100%"):
+        with ui.column().style("padding:16px 20px;gap:12px;width:100%;overflow-y:auto;flex:1"):
             f_titulo    = ui.input("Título do anúncio").props("outlined dense").classes("w-full")
+            
+            with ui.row().classes("w-full gap-3"):
+                f_tipo_transacao = ui.select(["VENDA", "ALUGUEL"], label="Transação", value="VENDA").props("outlined dense").style("flex: 1")
+                f_tipo_imovel = ui.select(["APARTAMENTO", "CASA", "COMERCIAL", "TERRENO", "COBERTURA", "KITINETE"], label="Tipo", value="APARTAMENTO").props("outlined dense").style("flex: 1")
+                f_preco     = ui.number("Preço (R$)", format="%.2f").props("outlined dense prefix=R$").style("flex: 1")
+            
+            with ui.row().classes("w-full gap-3 items-center"):
+                f_cep = ui.input("CEP").props("outlined dense mask='#####-###' unmasked-value").style("flex: 1")
+                ui.button("Buscar CEP", on_click=buscar_cep_create).props("outline color=primary size=sm").classes("h-10 px-4")
+            
+            with ui.row().classes("w-full gap-3"):
+                f_endereco  = ui.input("Logradouro (Rua, Av...)").props("outlined dense").style("flex: 2")
+                f_numero = ui.input("Número").props("outlined dense").style("flex: 1")
+            
+            with ui.row().classes("w-full gap-3"):
+                f_bairro = ui.input("Bairro").props("outlined dense").style("flex: 1")
+                f_cidade = ui.input("Cidade").props("outlined dense").style("flex: 1")
+                
             f_descricao = ui.textarea("Descrição").props("outlined dense").classes("w-full")
-            f_preco     = ui.number("Preço (R$)", format="%.2f").props("outlined dense prefix=R$").classes("w-full")
-            f_endereco  = ui.input("Endereço completo").props("outlined dense").classes("w-full")
-        modal_actions(dlg_c, do_create, "primary")
+            
+            # Seção de imagens
+            ui.label("Imagens do Imóvel").classes("font-semibold text-gray-800 mt-2")
+            ui.upload(on_upload=upload_foto_create, auto_upload=True, label="Clique ou arraste imagens aqui").props("outlined dense accept=.jpg,.jpeg,.png,.gif,.webp max-file-size=5242880").classes("w-full")
+            
+            ui.label("Prévia das imagens:").classes("font-sm text-gray-600 mt-2")
+            galeria_create = ui.element("div").classes("w-full").style("min-height:80px")
+        
+        with ui.row().style("justify-content:flex-end;gap:8px;padding:8px 20px 20px;border-top:1px solid #e2e8f0;flex-shrink:0"):
+            ui.button("Cancelar", on_click=dlg_c.close).props("flat color=grey")
+            ui.button("Salvar", on_click=do_create).props("color=primary unelevated rounded")
 
     # modal editar
-    with ui.dialog().props("persistent") as dlg_e, ui.card().style(CARD_STYLE):
-        with ui.element("div").style("background:#f97316;padding:16px 20px;border-radius:20px 20px 0 0"):
+    with ui.dialog().props("persistent") as dlg_e, ui.card().style(CARD_STYLE).style("max-width: 600px; display: flex; flex-direction: column; max-height: 90vh;"):
+        with ui.element("div").style("background:#f97316;padding:16px 20px;border-radius:20px 20px 0 0;flex-shrink:0"):
             ui.label("Editar Imóvel").style("color:white;font-size:17px;font-weight:700")
-        with ui.column().style("padding:16px 20px;gap:12px;width:100%"):
+        with ui.column().style("padding:16px 20px;gap:12px;width:100%;overflow-y:auto;flex:1"):
             e_titulo    = ui.input("Título do anúncio").props("outlined dense").classes("w-full")
+            
+            with ui.row().classes("w-full gap-3"):
+                e_tipo_transacao = ui.select(["VENDA", "ALUGUEL"], label="Transação").props("outlined dense").style("flex: 1")
+                e_tipo_imovel = ui.select(["APARTAMENTO", "CASA", "COMERCIAL", "TERRENO", "COBERTURA", "KITINETE"], label="Tipo").props("outlined dense").style("flex: 1")
+                e_preco     = ui.number("Preço (R$)", format="%.2f").props("outlined dense prefix=R$").style("flex: 1")
+            
+            with ui.row().classes("w-full gap-3 items-center"):
+                e_cep = ui.input("CEP (Opcional)").props("outlined dense mask='#####-###' unmasked-value").style("flex: 1")
+                ui.button("Buscar CEP", on_click=buscar_cep_edit).props("outline color=orange size=sm").classes("h-10 px-4")
+            
+            with ui.row().classes("w-full gap-3"):
+                e_endereco  = ui.input("Endereço Completo ou Logradouro").props("outlined dense").style("flex: 2")
+                e_numero = ui.input("Número (Opcional)").props("outlined dense").style("flex: 1")
+                
+            with ui.row().classes("w-full gap-3"):
+                e_bairro = ui.input("Bairro").props("outlined dense").style("flex: 1")
+                e_cidade = ui.input("Cidade (Opcional)").props("outlined dense").style("flex: 1")
+            
+            with ui.row().classes("w-full gap-3"):
+                e_status    = ui.select(["DISPONIVEL","ALUGADO","VENDIDO","INATIVO"], label="Status").props("outlined dense").style("flex: 1")
+                
             e_descricao = ui.textarea("Descrição").props("outlined dense").classes("w-full")
-            e_preco     = ui.number("Preço (R$)", format="%.2f").props("outlined dense prefix=R$").classes("w-full")
-            e_endereco  = ui.input("Endereço completo").props("outlined dense").classes("w-full")
-            e_status    = ui.select(["DISPONIVEL","ALUGADO","VENDIDO","INATIVO"], label="Status").props("outlined dense").classes("w-full")
-        modal_actions(dlg_e, do_edit, "orange")
+            
+            # Seção de imagens
+            ui.label("Imagens do Imóvel").classes("font-semibold text-gray-800 mt-2")
+            ui.upload(on_upload=upload_foto_edit, auto_upload=True, label="Clique ou arraste para adicionar mais imagens").props("outlined dense accept=.jpg,.jpeg,.png,.gif,.webp max-file-size=5242880").classes("w-full")
+            
+            ui.label("Imagens atuais:").classes("font-sm text-gray-600 mt-2")
+            galeria_edit = ui.element("div").classes("w-full").style("min-height:80px")
+        
+        with ui.row().style("justify-content:flex-end;gap:8px;padding:8px 20px 20px;border-top:1px solid #e2e8f0;flex-shrink:0"):
+            ui.button("Cancelar", on_click=dlg_e.close).props("flat color=grey")
+            ui.button("Salvar", on_click=do_edit).props("color=orange unelevated rounded")
 
     # modal status
     with ui.dialog().props("persistent") as dlg_s, ui.card().style("border-radius:20px;overflow:hidden;max-width:380px;width:100%"):
@@ -211,19 +472,38 @@ def build_clientes():
             for cl in items:
                 with ui.card().style("border-radius:16px;border:1px solid var(--border-color);box-shadow:0 1px 4px rgba(0,0,0,.06)").classes("responsive-card hover-effect animate-fade-in"):
                     with ui.card_section():
-                        with ui.row().classes("justify-between items-center w-full"):
+                        with ui.row().classes("justify-between items-start w-full"):
                             with ui.column().classes("gap-0"):
                                 ui.label(cl["nome"]).classes("font-semibold text-gray-800")
                                 ui.label(cl["contato"]).classes("text-sm text-gray-500")
-                            tag(cl["tipo"], TIPO_BG.get(cl["tipo"], "background:#f3f4f6;color:#6b7280"))
+                                if cl.get("cpf"):
+                                    ui.label(f"CPF: {cl['cpf']}").classes("text-xs text-blue-500 font-medium mt-1")
+                            with ui.column().classes("items-end gap-2"):
+                                tag(cl["tipo"], TIPO_BG.get(cl["tipo"], "background:#f3f4f6;color:#6b7280"))
+                                async def deletar_cliente(c=cl):
+                                    r = await api_delete(f"/clientes/{c['id']}")
+                                    if ok(r, "Cliente excluído!"): await refresh()
+                                ui.button("Deletar", on_click=lambda _, c=cl: deletar_cliente(c)).props("flat dense color=negative size=sm")
 
     async def do_create():
         if len(f_nome.value or "") < 3: ui.notify("Nome: mín. 3 caracteres", type="warning"); return
         if len(f_contato.value or "") < 8: ui.notify("Contato: mín. 8 caracteres", type="warning"); return
-        r = await api_post("/clientes/", {"nome": f_nome.value, "contato": f_contato.value, "tipo": f_tipo.value})
+        dados = {
+            "nome": f_nome.value,
+            "contato": f_contato.value,
+            "tipo": f_tipo.value,
+            "cpf": f_cpf.value if f_cpf.value else None,
+            "cep": f_cep.value if f_cep.value else None
+        }
+        r = await api_post("/clientes/", dados)
         if ok(r, "Cliente criado!"): dlg_c.close(); await refresh()
 
-    section_header("Clientes", "+ Novo Cliente", "teal", lambda: dlg_c.open())
+    def open_create():
+        f_nome.value = f_contato.value = f_cpf.value = f_cep.value = ""
+        f_tipo.value = "FISICA"
+        dlg_c.open()
+
+    section_header("Clientes", "+ Novo Cliente", "teal", open_create)
     lista = ui.element("div").style("display:flex;flex-wrap:wrap;gap:16px;width:100%")
 
     with ui.dialog().props("persistent") as dlg_c, ui.card().style(CARD_STYLE):
@@ -232,7 +512,10 @@ def build_clientes():
         with ui.column().style("padding:16px 20px;gap:12px;width:100%"):
             f_nome    = ui.input("Nome completo / Razão Social").props("outlined dense").classes("w-full")
             f_contato = ui.input("Telefone ou E-mail").props("outlined dense").classes("w-full")
-            f_tipo    = ui.select(["FISICA","JURIDICA"], label="Tipo de pessoa", value="FISICA").props("outlined dense").classes("w-full")
+            with ui.row().classes("w-full gap-3"):
+                f_tipo    = ui.select(["FISICA","JURIDICA"], label="Tipo de pessoa", value="FISICA").props("outlined dense").style("flex: 1")
+                f_cpf     = ui.input("CPF").props("outlined dense mask='###.###.###-##' unmasked-value").style("flex: 1")
+            f_cep     = ui.input("CEP (Busca endereço automaticamente)").props("outlined dense mask='#####-###' unmasked-value").classes("w-full")
         modal_actions(dlg_c, do_create, "teal")
 
     ui.timer(0.1, refresh, once=True)
@@ -418,12 +701,17 @@ def build_corretores():
                 status_text = "ATIVO" if cr.get("ativo") else "INATIVO"
                 with ui.card().style("border-radius:16px;border:1px solid var(--border-color);box-shadow:0 1px 4px rgba(0,0,0,.06)").classes("responsive-card hover-effect animate-fade-in"):
                     with ui.card_section():
-                        with ui.row().classes("justify-between items-center w-full"):
+                        with ui.row().classes("justify-between items-start w-full"):
                             with ui.column().classes("gap-0"):
                                 ui.label(cr["nome"]).classes("font-semibold text-gray-800")
                                 ui.label(cr["email"]).classes("text-sm text-gray-500")
                                 ui.label(f"CRECI: {cr['registro_profissional']}").classes("text-xs text-gray-400 mt-1")
-                            tag(status_text, status_color)
+                            with ui.column().classes("items-end gap-2"):
+                                tag(status_text, status_color)
+                                async def deletar_corretor(c=cr):
+                                    r = await api_delete(f"/corretores/{c['id']}")
+                                    if ok(r, "Corretor excluído!"): await refresh()
+                                ui.button("Deletar", on_click=lambda _, c=cr: deletar_corretor(c)).props("flat dense color=negative size=sm")
 
     async def do_create():
         if len(f_nome.value or "") < 3: ui.notify("Nome: mín. 3 caracteres", type="warning"); return
@@ -643,8 +931,8 @@ def catalogo_page():
         """Carrega lista de bairros disponíveis."""
         nonlocal bairros_disponiveis
         try:
-            async with httpx.AsyncClient() as c:
-                r = await c.get(f"{BASE}/imoveis/bairros/")
+            async with httpx.AsyncClient(follow_redirects=True) as c:
+                r = await c.get(f"{BASE}/imoveis/bairros")
             if r.status_code == 200:
                 bairros_disponiveis = r.json()
                 combo_bairro.options = ["Todos"] + bairros_disponiveis
@@ -676,15 +964,18 @@ def catalogo_page():
                 params["valor_max"] = slider_valor.value['max']
             
             # Faz requisição
-            async with httpx.AsyncClient() as c:
-                r = await c.get(f"{BASE}/imoveis/filtrado/", params=params)
+            async with httpx.AsyncClient(follow_redirects=True) as c:
+                r = await c.get(f"{BASE}/imoveis/filtrado", params=params)
             
             if r.status_code == 200:
                 imoveis_lista = r.json()
+                print(f"🔍 CATÁLOGO: O banco retornou {len(imoveis_lista)} imóveis com os filtros {params}")
                 await exibir_imoveis()
             else:
+                print(f"⚠️ ERRO AO BUSCAR IMÓVEIS NO CATÁLOGO: {r.status_code} - {r.text}")
                 ui.notify("Erro ao buscar imóveis", type="negative")
         except Exception as e:
+            print(f"❌ ERRO DE CONEXÃO NO CATÁLOGO: {e}")
             ui.notify(f"Erro: {e}", type="negative")
     
     async def exibir_imoveis():
@@ -703,7 +994,8 @@ def catalogo_page():
                 ).classes("catalogo-card hover-effect animate-fade-in").props("flat"):
                     
                     # Foto
-                    with ui.image(source=imovel.get("foto_url") or "/api/v1/static/placeholder.png").style(
+                    imagem_src = f"/static/{imovel['foto_url']}" if imovel.get("foto_url") else "https://placehold.co/600x400/eeeeee/999999?text=Sem+Foto"
+                    with ui.image(source=imagem_src).style(
                         "width:100%;height:200px;object-fit:cover"
                     ):
                         pass
@@ -746,7 +1038,7 @@ def catalogo_page():
     async def abrir_modal_detalhes(imovel_id: int):
         """Abre modal com detalhes do imóvel."""
         try:
-            async with httpx.AsyncClient() as c:
+            async with httpx.AsyncClient(follow_redirects=True) as c:
                 r = await c.get(f"{BASE}/imoveis/{imovel_id}")
             
             if r.status_code == 200:
@@ -757,7 +1049,7 @@ def catalogo_page():
                     with ui.card().style(f"max-width:600px;width:100%;border-radius:20px;overflow:hidden;border:1px solid var(--border-color);box-shadow:0 10px 40px rgba(0,0,0,.1)"):
                         # Foto grande
                         if im.get("foto_url"):
-                            ui.image(source=im["foto_url"]).style("width:100%;height:300px;object-fit:cover")
+                            ui.image(source=f"/static/{im['foto_url']}").style("width:100%;height:300px;object-fit:cover")
                         
                         # Detalhes
                         with ui.card_section():
@@ -801,7 +1093,7 @@ def catalogo_page():
                                         "tipo": "FISICA"
                                     }
                                     
-                                    async with httpx.AsyncClient() as c:
+                                    async with httpx.AsyncClient(follow_redirects=True) as c:
                                         r_cliente = await c.post(f"{BASE}/clientes/", json=dados_cliente)
                                     
                                     cliente_id = r_cliente.json().get("id") if r_cliente.status_code in (200, 201) else None
@@ -828,12 +1120,12 @@ def catalogo_page():
     
     # ── Layout da Página ──
     
-    with ui.header().style(f"background:linear-gradient(135deg, {PRIMARY_COLOR} 0%, {PRIMARY_DARK} 100%);padding:0;box-shadow:0 2px 12px rgba(0,0,0,.1)"):
+    with ui.header().style(f"background:#ffffff;border-bottom:1px solid {BORDER_COLOR};padding:0;box-shadow:none"):
         with ui.row().classes("items-center justify-between w-full px-6").style("height:70px;max-width:100%;margin:0 auto"):
             with ui.column().classes("gap-0 leading-none"):
-                ui.label("🏠 Catálogo de Imóveis").style("color:white;font-weight:700;font-size:20px")
-                ui.label("Encontre seu imóvel ideal").style("color:#e0e7ff;font-size:12px")
-            ui.button("Entrar", on_click=lambda: ui.navigate.to("/login")).props("color=white flat").classes("px-6")
+                ui.label("Catálogo de Imóveis").style(f"color:{TEXT_PRIMARY};font-weight:700;font-size:20px")
+                ui.label("Encontre seu imóvel ideal").style(f"color:{TEXT_SECONDARY};font-size:12px")
+            ui.button("Entrar", on_click=lambda: ui.navigate.to("/login")).props("color=black flat").classes("px-6")
     
     with ui.column().classes("w-full gap-6").style(f"background:{BG_LIGHT};padding:32px 24px;min-height:calc(100vh - 70px)"):
         # Container centralizado
@@ -897,9 +1189,9 @@ def login_page():
 
     with ui.column().classes("w-full absolute inset-0 justify-center items-center").style(f"background:{BG_LIGHT};padding:24px"):
         with ui.card().style(f"width:100%;max-width:333px;border-radius:24px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.08);border:1px solid {BORDER_COLOR}"):
-            with ui.element("div").style(f"width:100% ;background:linear-gradient(135deg, {PRIMARY_COLOR} 0%, {PRIMARY_DARK} 100%);padding:40px 32px 32px;text-align:center"):
-                ui.label("🏠 ERP Imobiliária").style("color:white;font-size:24px;font-weight:700;display:block")
-                ui.label("Sistema de Gestão de Imóveis").style("color:#e0e7ff;font-size:13px;display:block;margin-top:8px")
+            with ui.element("div").style(f"width:100%;background:#ffffff;border-bottom:1px solid {BORDER_COLOR};padding:40px 32px 32px;text-align:center"):
+                ui.label("IMOBFACIL").style(f"color:{TEXT_PRIMARY};font-size:24px;font-weight:700;display:block")
+                ui.label("Sistema de Gestão de Imóveis").style(f"color:{TEXT_SECONDARY};font-size:13px;display:block;margin-top:8px")
             with ui.column().style(f"padding:32px;gap:16px;background:white"):
                 u_input = ui.input("Usuário ou E-mail").props("outlined dense").classes("w-full")
                 u_input.props("placeholder=Digite seu usuário")
@@ -923,14 +1215,14 @@ def main_page():
         session["username"] = None
         ui.navigate.to("/login")
 
-    with ui.header().style("background:#0f172a;padding:0;box-shadow:0 2px 12px rgba(0,0,0,.4)"):
+    with ui.header().style(f"background:#ffffff;border-bottom:1px solid {BORDER_COLOR};padding:0;box-shadow:none"):
         with ui.row().classes("items-center justify-between w-full px-8").style("height:60px"):
             with ui.column().classes("gap-0 leading-none"):
-                ui.label("ERP Imobiliária").style("color:white;font-weight:700;font-size:16px")
-                ui.label("Sistema de Gestão").style("color:#94a3b8;font-size:11px")
+                ui.label("IMOBFACIL").style(f"color:{TEXT_PRIMARY};font-weight:700;font-size:16px")
+                ui.label("Sistema de Gestão").style(f"color:{TEXT_SECONDARY};font-size:11px")
             with ui.row().classes("items-center gap-4"):
-                ui.label(f"● {session['username']}").style("color:#4ade80;font-size:13px")
-                ui.button("Sair", on_click=do_logout).props("flat color=grey size=sm")
+                ui.label(f"{session['username']}").style(f"color:{TEXT_PRIMARY};font-size:13px;font-weight:500")
+                ui.button("Sair", on_click=do_logout).props("flat color=black size=sm")
 
     with ui.column().classes("w-full max-w-5xl mx-auto px-6 py-6 gap-4"):
         with ui.card().classes("w-full rounded-2xl shadow-sm p-0 overflow-hidden"):
@@ -959,4 +1251,4 @@ def main_page():
             with ui.tab_panel(t7).classes("p-0 pt-2"):
                 build_visitas()
 
-ui.run(title="ERP Imobiliária", dark=False, port=8080)
+ui.run(title="IMOBFACIL", dark=False, port=8080)

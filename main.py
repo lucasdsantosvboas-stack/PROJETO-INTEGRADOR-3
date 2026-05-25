@@ -12,7 +12,7 @@ from pathlib import Path
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="API Imobiliária - ERP",
+    title="API IMOBFACIL",
     description="Sistema de gestão imobiliária.",
     version="1.0.0"
 )
@@ -44,7 +44,7 @@ if static_dir.exists():
 async def root():
     """Redireciona para o catálogo de imóveis."""
     return {
-        "message": "Bem-vindo à API Imobiliária",
+        "message": "Bem-vindo à API IMOBFACIL",
         "endpoints": {
             "api_docs": "/docs",
             "imoveis": "/api/v1/imoveis",

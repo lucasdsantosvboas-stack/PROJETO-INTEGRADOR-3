@@ -1,7 +1,7 @@
 # Tabelas do banco de dados (Modelos do SQLAlchemy)
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import Date, ForeignKey, String, Numeric, Enum as SQLEnum
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from domain import TipoTransacao, StatusPagamento, StatusImovel, TipoCliente, TipoParcela, StatusLead, StatusVisita, TipoImovel
 from sqlalchemy import Date
@@ -27,10 +27,25 @@ class Imovel(Base):
     preco_atual: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False) 
     status: Mapped[StatusImovel] = mapped_column(SQLEnum(StatusImovel), default=StatusImovel.DISPONIVEL)
     endereco: Mapped[str] = mapped_column(String(255), nullable=False)
-    foto_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # Caminho relativo da foto
     bairro: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # Bairro para filtro
     tipo_imovel: Mapped[Optional[TipoImovel]] = mapped_column(SQLEnum(TipoImovel), nullable=True)  # Tipo: Apartamento, Casa, etc
     tipo_transacao: Mapped[Optional[TipoTransacao]] = mapped_column(SQLEnum(TipoTransacao), nullable=True)  # VENDA, ALUGUEL ou ambos
+    foto_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True) # Caminho relativo da foto principal
+    
+    # Relacionamento com fotos
+    fotos: Mapped[List["FotoImovel"]] = relationship(back_populates="imovel", cascade="all, delete-orphan", lazy="selectin")
+
+class FotoImovel(Base):
+    __tablename__ = "fotos_imoveis"
+    
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    imovel_id: Mapped[int] = mapped_column(ForeignKey("imoveis.id"), nullable=False)
+    foto_url: Mapped[str] = mapped_column(String(500), nullable=False)  # Caminho relativo da foto
+    ordem: Mapped[int] = mapped_column(default=0)  # Para ordenar as fotos
+    data_upload: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    
+    # Relacionamento inverso
+    imovel: Mapped["Imovel"] = relationship(back_populates="fotos")
 
 class HistoricoStatus(Base):
     __tablename__ = "historico_status"

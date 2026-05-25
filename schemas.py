@@ -12,19 +12,35 @@ class ImovelBase(BaseModel):
     preco_atual: float = Field(..., gt=0, description="O preço deve ser maior que zero")
     status: StatusImovel = StatusImovel.DISPONIVEL
     endereco: str = Field(..., min_length=10, max_length=255)
-    foto_url: Optional[str] = Field(None, description="Caminho relativo da foto no servidor")
     bairro: Optional[str] = Field(None, max_length=100, description="Bairro do imóvel")
     tipo_imovel: Optional[TipoImovel] = Field(None, description="Tipo: Apartamento, Casa, Comercial, etc")
     tipo_transacao: Optional[TipoTransacao] = Field(None, description="Tipo de transação: VENDA ou ALUGUEL")
+    foto_url: Optional[str] = Field(None, description="Caminho relativo da foto principal do imóvel")
 
 # Schema usado no POST (quando o usuário envia os dados via NiceGUI)
 # Não tem ID, porque o banco quem gera.
 class ImovelCreate(ImovelBase):
     pass 
 
+# Schema para fotos de imóveis
+class FotoImovelBase(BaseModel):
+    foto_url: str
+    ordem: int = 0
+
+class FotoImovelCreate(FotoImovelBase):
+    imovel_id: int
+
+class FotoImovelResponse(FotoImovelBase):
+    id: int
+    imovel_id: int
+    data_upload: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
 # Schema usado no GET e no retorno do POST (quando o FastAPI devolve pro NiceGUI)
 class ImovelResponse(ImovelBase):
     id: int
+    fotos: list[FotoImovelResponse] = []
 
     # Essa configuração permite que o Pydantic leia diretamente o objeto do SQLAlchemy
     model_config = ConfigDict(from_attributes=True)
@@ -40,7 +56,7 @@ class ClienteBase(BaseModel):
 
 class ClienteCreate(ClienteBase):
     cpf: Optional[str] = Field(None, description="CPF (apenas para Pessoa Física, será validado)")
-    cep: Optional[str] = Field(None, description="CEP para auto-preenchimento de endereço via BrasilAPI")
+    cep: Optional[str] = Field(None, exclude=True, description="CEP para auto-preenchimento de endereço via BrasilAPI")
     bairro: Optional[str] = Field(None, max_length=100)
     cidade: Optional[str] = Field(None, max_length=100)
     uf: Optional[str] = Field(None, max_length=2)

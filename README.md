@@ -1,6 +1,6 @@
-# 🏠 Sistema Imobiliário - Guia de Implementação e Uso
+# IMOBFACIL - Guia de Implementação e Uso
 
-## ✅ O que foi implementado
+## O que foi implementado
 
 ### 1. **Upload de Fotos dos Imóveis**
 - Endpoint: `POST /api/v1/imoveis/upload-foto`
@@ -62,7 +62,7 @@
 
 ---
 
-## 🚀 Como Usar
+## Como Usar
 
 ### 1. Instalar Dependências
 ```bash
@@ -91,7 +91,7 @@ python frontend.py
 
 ---
 
-## 📋 Workflow de Cadastro de Imóvel
+## Workflow de Cadastro de Imóvel
 
 ### 1. Fazer Upload de Foto
 ```bash
@@ -129,7 +129,7 @@ Content-Type: application/json
 
 ---
 
-## 📋 Workflow de Cadastro de Cliente
+## Workflow de Cadastro de Cliente
 
 ### Opção 1: Com CPF e CEP (Recomendado)
 ```bash
@@ -176,7 +176,7 @@ Content-Type: application/json
 
 ---
 
-## 🔍 Endpoints de Filtro
+## Endpoints de Filtro
 
 ### Listar Bairros Disponíveis
 ```bash
@@ -207,7 +207,7 @@ GET /api/v1/imoveis/filtrado/?bairro=Centro&tipo=VENDA&tipo_imovel=APARTAMENTO&v
 
 ---
 
-## 🗂️ Estrutura de Arquivos
+## Estrutura de Arquivos
 
 ```
 projeto/
@@ -269,7 +269,7 @@ projeto/
 
 ---
 
-## 📊 Arquitetura do Banco de Dados (Diagrama UML)
+## Arquitetura do Banco de Dados (Diagrama UML)
 
 O diagrama abaixo ilustra o modelo de domínio relacional da aplicação. No GitHub ou em visualizadores Markdown compatíveis, ele é renderizado automaticamente como imagem.
 
@@ -331,7 +331,7 @@ classDiagram
     Corretor "1" <-- "0..*" Visita : conduz
 ```
 
-## � Próximos Passos (Futuro)
+## Próximos Passos (Futuro)
 
 1. **Múltiplas fotos por imóvel**: Criar tabela `ImovelFoto` (1:N)
 2. **Galeria de fotos**: Implementar carousel no modal de detalhes
@@ -346,7 +346,7 @@ classDiagram
 
 ---
 
-## ✅ Testes Unitários Recomendados
+## Testes Unitários Recomendados
 
 ```python
 # Teste validação de CPF
@@ -369,20 +369,20 @@ GET /api/v1/imoveis/filtrado?bairro=Centro&tipo=VENDA
 
 ---
 
-## 🎯 Resumo de Requisitos Atendidos
+## Resumo de Requisitos Atendidos
 
-✅ **Upload de fotos dos imóveis**
-✅ **Listagem de imóveis disponíveis**
-✅ **Auto-cadastro de clientes com informações pertinentes**
-✅ **Verificação de CPF via cálculo (brutils)**
-✅ **Inclusão da API de CEP (BrasilAPI)**
-✅ **Tela inicial de clientes via navegador** (público)
-✅ **Exibição de imóveis disponíveis**
-✅ **Filtros por bairro** (com bairros de São José do Rio Preto)
-✅ **Filtros por valor do imóvel**
-✅ **Filtros por tipo (aluguel ou venda)**
-✅ **Filtros por tipo de imóvel**
+- **Upload de fotos dos imóveis**
+- **Listagem de imóveis disponíveis**
+- **Auto-cadastro de clientes com informações pertinentes**
+- **Verificação de CPF via cálculo (brutils)**
+- **Inclusão da API de CEP (BrasilAPI)**
+- **Tela inicial de clientes via navegador** (público)
+- **Exibição de imóveis disponíveis**
+- **Filtros por bairro** (com bairros de São José do Rio Preto)
+- **Filtros por valor do imóvel**
+- **Filtros por tipo (aluguel ou venda)**
+- **Filtros por tipo de imóvel**
 
 ---
 
-**Implementado com ❤️ em 23 de maio de 2026**
+**Implementado em 23 de maio de 2026**
