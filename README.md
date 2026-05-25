@@ -271,7 +271,7 @@ projeto/
 
 ## 📊 Arquitetura do Banco de Dados (Diagrama UML)
 
-O diagrama abaixo ilustra o modelo de domínio relacional da aplicação. No GitHub ou em visualizadores Markdown compatíveis, ele é renderizado automaticamente como imagem.
+O diagrama abaixo ilustra o modelo de domínio relacional da aplicação.
 
 ```mermaid
 classDiagram
